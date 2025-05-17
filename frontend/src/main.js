@@ -3,25 +3,20 @@ import App from "./App.vue";
 import router from "./router";
 import store from "./store";
 
-// Vuetify
-import "vuetify/styles";
-import { createVuetify } from "vuetify";
-import * as components from "vuetify/components";
-import * as directives from "vuetify/directives";
-import "@mdi/font/css/materialdesignicons.css";
-
-const vuetify = createVuetify({
-  components,
-  directives,
-  theme: {
-    defaultTheme: "light",
-  },
-});
+// Element Plus
+import ElementPlus from "element-plus";
+import "element-plus/dist/index.css";
+import * as ElementPlusIconsVue from "@element-plus/icons-vue";
 
 const app = createApp(App);
 
+// Registriere alle Icons
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+  app.component(key, component);
+}
+
 app.use(store);
 app.use(router);
-app.use(vuetify);
+app.use(ElementPlus);
 
 app.mount("#app");

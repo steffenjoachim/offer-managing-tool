@@ -1,7 +1,11 @@
 import { createStore } from "vuex";
 import axios from "axios";
+import auth from "./modules/auth";
 
 export default createStore({
+  modules: {
+    auth,
+  },
   state: {
     isAdmin: false,
     user: null,
@@ -66,7 +70,7 @@ export default createStore({
           .then((response) => {
             const user = response.data;
             commit("setUser", user);
-            commit("setAdmin", user.is_admin);
+            commit("setAdmin", user.is_admin || false);
             commit("setTokens", { access: accessToken, refresh: refreshToken });
           })
           .catch(() => {
