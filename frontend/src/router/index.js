@@ -1,36 +1,35 @@
 import { createRouter, createWebHistory } from "vue-router";
-import Home from "../views/Home.vue";
-import Login from "../views/Login.vue";
-import store from "../store";
+import store from "@/store";
 
 const routes = [
   {
     path: "/",
     name: "Home",
-    component: Home,
+    component: () => import("@/core/Home.vue"),
     meta: { requiresAuth: true },
   },
   {
     path: "/login",
     name: "Login",
-    component: Login,
+    component: () => import("@/store/views/Login.vue"),
+    meta: { requiresAuth: false },
   },
   {
     path: "/customers",
     name: "Customers",
-    component: () => import("../views/Customers.vue"),
+    component: () => import("@/store/views/Customers.vue"),
     meta: { requiresAuth: true },
   },
   {
     path: "/offers",
     name: "Offers",
-    component: () => import("../views/Offers.vue"),
+    component: () => import("@/store/views/Offers.vue"),
     meta: { requiresAuth: true },
   },
   {
     path: "/templates",
     name: "Templates",
-    component: () => import("../views/Templates.vue"),
+    component: () => import("@/store/views/Templates.vue"),
     meta: { requiresAuth: true, requiresAdmin: true },
   },
 ];
@@ -40,29 +39,25 @@ const router = createRouter({
   routes,
 });
 
-// Navigation Guard
+// Navigation Guards
 router.beforeEach((to, from, next) => {
-  // Prüfen, ob die Route Authentifizierung erfordert
-  if (to.matched.some((record) => record.meta.requiresAuth)) {
-    // Prüfen, ob der Benutzer angemeldet ist
-    if (!store.getters.isLoggedIn) {
-      next({
-        path: "/login",
-        query: { redirect: to.fullPath },
-      });
-    } else {
-      // Prüfen, ob die Route Admin-Rechte erfordert
-      if (to.matched.some((record) => record.meta.requiresAdmin)) {
-        if (!store.getters.isAdmin) {
-          next({ path: "/" });
-        } else {
-          next();
-        }
-      } else {
-        next();
-      }
-    }
-  } else {
+  const isLoggedIn = store.getters["auth/isLoggedIn"];
+  const isAdmin = store.getters["auth/isAdmin"];
+
+  // Wenn die Route Auth erfordert und der Benutzer nicht eingeloggt ist
+  if (to.meta.requiresAuth && !isLoggedIn) {
+    next("/login");
+  }
+  // Wenn die Route Admin-Rechte erfordert und der Benutzer kein Admin ist
+  else if (to.meta.requiresAdmin && !isAdmin) {
+    next("/");
+  }
+  // Wenn der Benutzer eingeloggt ist und versucht, zur Login-Seite zu gehen
+  else if (to.path === "/login" && isLoggedIn) {
+    next("/");
+  }
+  // In allen anderen Fällen erlauben
+  else {
     next();
   }
 });
