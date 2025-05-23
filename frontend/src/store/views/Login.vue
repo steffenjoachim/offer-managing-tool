@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <el-icon><UserFilled /></el-icon>
-          <span>Anmelden</span>
+          <span>Login</span>
         </div>
       </template>
 
@@ -15,18 +15,15 @@
         label-position="top"
         @submit.prevent="handleLogin"
       >
-        <el-form-item label="Benutzername" prop="username">
-          <el-input
-            v-model="loginData.username"
-            placeholder="Benutzername eingeben"
-          />
+        <el-form-item label="Username" prop="username">
+          <el-input v-model="loginData.username" placeholder="Enter username" />
         </el-form-item>
 
-        <el-form-item label="Passwort" prop="password">
+        <el-form-item label="Password" prop="password">
           <el-input
             v-model="loginData.password"
             type="password"
-            placeholder="Passwort eingeben"
+            placeholder="Enter password"
             show-password
           />
         </el-form-item>
@@ -38,9 +35,14 @@
             :loading="loading"
             class="login-button"
           >
-            Anmelden
+            Login
           </el-button>
         </el-form-item>
+
+        <div class="register-link">
+          <span>No account yet?</span>
+          <router-link to="/register" class="link">Register now</router-link>
+        </div>
       </el-form>
     </el-card>
   </div>
@@ -73,12 +75,12 @@ export default {
       username: [
         {
           required: true,
-          message: "Bitte Benutzername eingeben",
+          message: "Please enter username",
           trigger: "blur",
         },
       ],
       password: [
-        { required: true, message: "Bitte Passwort eingeben", trigger: "blur" },
+        { required: true, message: "Please enter password", trigger: "blur" },
       ],
     };
 
@@ -90,17 +92,15 @@ export default {
         loading.value = true;
 
         const response = await store.dispatch("auth/login", loginData);
-        console.log("Login response:", response); // Debug-Log
+        console.log("Login response:", response);
 
         if (response) {
-          ElMessage.success("Erfolgreich angemeldet!");
+          ElMessage.success("Login successful!");
           await router.push("/");
         }
       } catch (error) {
         console.error("Login error:", error);
-        ElMessage.error(
-          error.response?.data?.detail || "Anmeldung fehlgeschlagen"
-        );
+        ElMessage.error(error.response?.data?.detail || "Login failed");
       } finally {
         loading.value = false;
       }
@@ -143,5 +143,21 @@ export default {
 
 .login-button {
   width: 100%;
+}
+
+.register-link {
+  text-align: center;
+  margin-top: 1rem;
+  color: #606266;
+}
+
+.register-link .link {
+  color: #409eff;
+  text-decoration: none;
+  margin-left: 0.5rem;
+}
+
+.register-link .link:hover {
+  text-decoration: underline;
 }
 </style>
