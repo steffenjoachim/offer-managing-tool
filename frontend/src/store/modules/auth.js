@@ -12,26 +12,49 @@ const getters = {
 };
 
 const actions = {
+  async register({ commit }, credentials) {
+    try {
+      const response = await axios.post(
+        "http://localhost:8000/api/auth/register/",
+        credentials
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Registration error:", error);
+      throw error;
+    }
+  },
+
   async login({ commit }, credentials) {
     try {
       const response = await axios.post(
         "http://localhost:8000/api/auth/login/",
-        credentials
+        {
+          username: credentials.username,
+          password: credentials.password,
+        }
       );
       const { access, refresh } = response.data;
 
-      // Token im localStorage speichern
+      // Store tokens in localStorage
       localStorage.setItem("token", access);
       localStorage.setItem("refresh", refresh);
 
-      // User-Informationen speichern
-      const user = {
-        username: credentials.username,
-        isAdmin: false, // Wird später vom Backend gesetzt
-      };
+      // Fetch user details
+      const userResponse = await axios.get(
+        "http://localhost:8000/api/auth/user/",
+        {
+          headers: {
+            Authorization: `Bearer ${access}`,
+          },
+        }
+      );
+
+      // Store user info
+      const user = userResponse.data;
       localStorage.setItem("user", JSON.stringify(user));
 
-      // Axios Default Header setzen
+      // Set axios default header
       axios.defaults.headers.common["Authorization"] = `Bearer ${access}`;
 
       commit("SET_AUTH", { token: access, user });
@@ -44,12 +67,12 @@ const actions = {
 
   async logout({ commit }) {
     try {
-      // Token aus localStorage entfernen
+      // Remove tokens from localStorage
       localStorage.removeItem("token");
       localStorage.removeItem("refresh");
       localStorage.removeItem("user");
 
-      // Axios Default Header entfernen
+      // Remove axios default header
       delete axios.defaults.headers.common["Authorization"];
 
       commit("CLEAR_AUTH");
@@ -65,7 +88,7 @@ const actions = {
       const user = JSON.parse(localStorage.getItem("user"));
 
       if (token && user) {
-        // Axios Default Header setzen
+        // Set axios default header
         axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
         commit("SET_AUTH", { token, user });
       }
