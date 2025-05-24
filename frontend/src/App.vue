@@ -18,6 +18,9 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
+                <el-dropdown-item command="createListing"
+                  >Create Listing</el-dropdown-item
+                >
                 <el-dropdown-item command="myMessages"
                   >My Messages</el-dropdown-item
                 >
@@ -61,9 +64,12 @@ export default {
       if (command === "logout") {
         await store.dispatch("auth/logout");
         router.push("/login");
-      } else {
-        // Handle other commands later
-        console.log(`Command received: ${command}`);
+      } else if (command === "createListing") {
+        router.push("/create-listing");
+      } else if (command === "myListings") {
+        router.push("/my-listings");
+      } else if (command === "myMessages") {
+        router.push("/my-messages");
       }
     };
 

@@ -8,4 +8,5 @@ urlpatterns = [
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/logout/', LogoutView.as_view(), name='logout'),
     path('auth/user/', UserDetailView.as_view(), name='user-detail'),
+    path('listings/', include('ads.urls')),
 ] 
