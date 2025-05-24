@@ -1,10 +1,12 @@
 import { createStore } from "vuex";
 import axios from "axios";
 import auth from "./modules/auth";
+import listings from "./modules/listings";
 
 export default createStore({
   modules: {
     auth,
+    listings,
   },
   state: {
     isAdmin: false,
