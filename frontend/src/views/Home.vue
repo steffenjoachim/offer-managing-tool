@@ -1,6 +1,6 @@
 <template>
   <div class="home-container">
-    <h1 class="section-title">Recommended Listings for You</h1>
+    <h1 class="section-title">Recommended Listings for You:</h1>
 
     <el-row :gutter="10">
       <el-col
@@ -11,7 +11,11 @@
         :md="6"
         :lg="4"
       >
-        <el-card class="listing-card" :body-style="{ padding: '0px' }">
+        <el-card
+          class="listing-card"
+          :body-style="{ padding: '0px' }"
+          @click="goToListingDetail(listing.id)"
+        >
           <img
             :src="
               Array.isArray(listing.bilder) && listing.bilder.length > 0
@@ -37,12 +41,14 @@
 <script>
 import { ref, onMounted } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 
 export default {
   name: "HomePage",
   setup() {
     const store = useStore();
     const listings = ref([]);
+    const router = useRouter();
 
     const handleImageError = (e) => {
       console.error("Bild konnte nicht geladen werden:", e);
@@ -59,6 +65,10 @@ export default {
       }
     };
 
+    const goToListingDetail = (id) => {
+      router.push({ name: "ListingDetail", params: { id: id } });
+    };
+
     onMounted(() => {
       fetchListings();
     });
@@ -66,6 +76,7 @@ export default {
     return {
       listings,
       handleImageError,
+      goToListingDetail,
     };
   },
 };
