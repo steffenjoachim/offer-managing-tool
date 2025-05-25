@@ -29,6 +29,18 @@ const routes = [
     component: CreateListing,
     meta: { requiresAuth: true },
   },
+  {
+    path: "/listing/:id",
+    name: "ListingDetail",
+    component: () =>
+      import(
+        /* webpackChunkName: "listing-detail" */ "../views/ListingDetail.vue"
+      ),
+    props: true,
+  },
+  {
+    path: "/about",
+  },
 ];
 
 const router = createRouter({
