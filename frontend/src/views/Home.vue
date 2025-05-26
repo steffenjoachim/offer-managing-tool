@@ -42,6 +42,7 @@
 import { ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import axios from "axios";
 
 export default {
   name: "HomePage",
@@ -57,11 +58,10 @@ export default {
 
     const fetchListings = async () => {
       try {
-        const response = await store.dispatch("listings/fetchListings");
-        console.log("Anzeigen geladen:", response);
-        listings.value = response;
+        const response = await axios.get("http://localhost:8000/api/listings/");
+        listings.value = response.data;
       } catch (error) {
-        console.error("Fehler beim Laden der Anzeigen:", error);
+        console.error("Error fetching listings:", error);
       }
     };
 

@@ -4,15 +4,14 @@
       <h2 class="listing-title-detail">{{ listing.titel }}</h2>
 
       <div class="content-container">
+        <!-- Left Section: Main Image -->
         <div class="image-section">
-          <!-- Main Image (first image) -->
           <img
             v-if="listing.bilder && listing.bilder.length > 0"
             :src="listing.bilder[0].bild"
             alt="Main Listing Image"
             class="main-detail-image"
           />
-          <!-- Placeholder if no images -->
           <img
             v-else
             src="/images/placeholder-image.svg"
@@ -21,13 +20,10 @@
           />
         </div>
 
+        <!-- Right Section: Details -->
         <div class="details-section">
           <div class="price-and-actions">
             <p class="listing-price-detail">€{{ listing.preis }}</p>
-            <div class="action-buttons">
-              <el-button type="primary">Send Message</el-button>
-              <el-button>Add to Watchlist</el-button>
-            </div>
           </div>
 
           <p class="listing-description">{{ listing.beschreibung }}</p>
@@ -50,7 +46,7 @@
                 />
               </div>
             </div>
-            <!-- Navigation Arrows below images -->
+            <!-- Navigation Arrows -->
             <div class="image-navigation" v-if="showScrollArrows">
               <div
                 class="image-nav-arrow left"
@@ -76,6 +72,21 @@
           </div>
         </div>
       </div>
+
+      <!-- Bottom Section: Message Form -->
+      <div class="message-section">
+        <div class="action-buttons">
+          <el-button type="primary" @click="toggleMessageForm"
+            >Send Message</el-button
+          >
+          <el-button>Add to Watchlist</el-button>
+        </div>
+        <MessageForm
+          v-if="showMessageForm"
+          :recipient="listing.user"
+          @message-sent="handleMessageSent"
+        />
+      </div>
     </div>
     <div v-else>
       <p>Loading listing details...</p>
@@ -88,11 +99,13 @@ import { ref, onMounted, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import axios from "axios";
 import { ElButton } from "element-plus";
+import MessageForm from "@/components/MessageForm.vue";
 
 export default {
   name: "ListingDetail",
   components: {
     ElButton,
+    MessageForm,
   },
   setup() {
     const listing = ref(null);
@@ -100,6 +113,7 @@ export default {
     const listingId = route.params.id;
     const additionalImagesList = ref(null);
     const showScrollArrows = ref(false); // State to control arrow visibility
+    const showMessageForm = ref(false);
 
     const fetchListing = async () => {
       try {
@@ -142,6 +156,22 @@ export default {
       }
     };
 
+    const toggleMessageForm = () => {
+      showMessageForm.value = !showMessageForm.value;
+    };
+
+    const handleMessageSent = (messageData) => {
+      console.log("Message Data:", {
+        sender: "current_user", // This will be replaced with actual user data
+        recipient: listing.value.user,
+        content: messageData.content,
+        timestamp: new Date().toISOString(),
+        listingId: listingId,
+        listingTitle: listing.value.titel,
+      });
+      showMessageForm.value = false;
+    };
+
     onMounted(() => {
       fetchListing();
     });
@@ -151,6 +181,9 @@ export default {
       additionalImagesList,
       showScrollArrows,
       scrollAdditionalImages,
+      showMessageForm,
+      toggleMessageForm,
+      handleMessageSent,
     };
   },
 };
@@ -171,18 +204,42 @@ export default {
 
 .content-container {
   display: flex;
-  gap: 30px; /* Space between image section and details section */
-  flex-wrap: wrap; /* Allow wrapping on smaller screens */
+  gap: 30px;
+  margin-bottom: 30px;
 }
 
 .image-section {
-  flex: 1; /* Allow image section to grow */
-  min-width: 300px; /* Minimum width to prevent shrinking too much */
+  flex: 1;
+  min-width: 300px;
 }
 
-.main-image-container {
-  flex: 3; /* Main image takes more space */
-  max-width: 600px;
+.details-section {
+  flex: 1;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.message-section {
+  width: 100%;
+  margin-top: 20px;
+  padding: 20px;
+  border-top: 1px solid #eee;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  justify-content: center;
+}
+
+.action-buttons .el-button {
+  margin-left: 0;
+  min-width: 120px;
+  height: 40px;
+  white-space: nowrap;
 }
 
 .main-detail-image {
@@ -192,20 +249,6 @@ export default {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.details-section {
-  flex: 1; /* Allow details section to grow */
-  min-width: 300px; /* Minimum width */
-}
-
-.price-and-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  flex-wrap: wrap; /* Allow buttons to wrap */
-  gap: 10px; /* Add gap between wrapped items */
-}
-
 .listing-price-detail {
   font-size: 24px;
   font-weight: bold;
@@ -213,29 +256,15 @@ export default {
   margin: 0;
 }
 
-.action-buttons {
-  display: flex;
-  gap: 10px; /* Consistent gap between buttons */
-  flex-wrap: wrap; /* Allow buttons to wrap */
-}
-
-.action-buttons .el-button {
-  margin-left: 0; /* Remove default margin */
-  min-width: 120px; /* Ensure minimum width for buttons */
-  height: 40px; /* Set consistent height */
-  white-space: nowrap; /* Prevent text wrapping */
-}
-
 .listing-description {
-  margin-top: 20px;
-  margin-bottom: 20px;
+  margin: 0;
   color: #555;
   line-height: 1.6;
-  word-wrap: break-word; /* Added to prevent overflow */
+  word-wrap: break-word;
 }
 
 .seller-info {
-  margin-top: 20px; /* Add space above seller info */
+  margin: 0;
 }
 
 .seller-info p {
@@ -245,14 +274,13 @@ export default {
 }
 
 .additional-images-container {
-  margin-top: 20px; /* Add space above the thumbnail container */
-  border: 1px solid #ddd; /* Add border to the container */
-  border-radius: 8px; /* Match border radius with main image */
-  padding: 10px; /* Add padding inside the border */
-  /* Removed position: relative */
-  display: flex; /* Use flexbox for column layout */
-  flex-direction: column; /* Stack images and navigation vertically */
-  align-items: center; /* Center items horizontally */
+  margin: 0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .additional-images-list {
@@ -260,55 +288,51 @@ export default {
   flex-direction: row;
   gap: 10px;
   overflow-x: auto;
-  overflow-y: hidden; /* Hide vertical scrollbar */
-  /* Hide scrollbar for IE, Edge and Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
-  padding-bottom: 10px; /* Add padding for scrollbar space if needed */
-  width: 100%; /* Ensure list takes full width for scrolling */
+  overflow-y: hidden;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  padding-bottom: 10px;
+  width: 100%;
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
 .additional-images-list::-webkit-scrollbar {
   display: none;
 }
 
 .thumbnail-container {
-  flex-shrink: 0; /* Prevent thumbnails from shrinking */
-  width: 100px; /* Example thumbnail size */
-  /* Removed individual border and padding */
+  flex-shrink: 0;
+  width: 100px;
   cursor: pointer;
 }
 
 .thumbnail-image {
-  width: 100%; /* Thumbnails take full width of their container */
+  width: 100%;
   height: auto;
   display: block;
-  border-radius: 4px; /* Add border radius to images */
+  border-radius: 4px;
 }
 
 .image-navigation {
   display: flex;
-  justify-content: center; /* Center arrows horizontally */
+  justify-content: center;
   width: 100%;
-  margin-top: 10px; /* Space above navigation */
-  gap: 20px; /* Space between arrows */
+  margin-top: 10px;
+  gap: 20px;
 }
 
 .image-nav-arrow {
-  /* Removed absolute positioning */
   background-color: rgba(255, 255, 255, 0.7);
   border: 1px solid #ccc;
   border-radius: 50%;
-  width: 25px; /* Smaller size */
-  height: 25px; /* Smaller size */
+  width: 25px;
+  height: 25px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  user-select: none; /* Prevent text selection */
-  z-index: 10; /* Ensure arrows are above images */
-  font-size: 14px; /* Smaller font size */
+  user-select: none;
+  z-index: 10;
+  font-size: 14px;
   color: #333;
   transition: background-color 0.2s ease;
 }
@@ -317,9 +341,6 @@ export default {
   background-color: rgba(255, 255, 255, 1);
 }
 
-/* Removed specific left/right positioning */
-
-/* Responsive adjustments */
 @media (max-width: 768px) {
   .content-container {
     flex-direction: column;
@@ -331,8 +352,7 @@ export default {
   }
 
   .additional-images-container {
-    margin-top: 20px; /* Keep margin on smaller screens */
-    /* Adjust layout for stacking */
+    margin-top: 20px;
   }
 
   .additional-images-list {
@@ -357,13 +377,13 @@ export default {
   }
 
   .action-buttons {
-    width: 100%; /* Full width on small screens */
-    margin-top: 10px; /* Add space between price and buttons */
+    width: 100%;
+    margin-top: 10px;
   }
 
   .action-buttons .el-button {
-    flex: 1; /* Equal width for buttons when stacked */
-    min-width: 0; /* Allow buttons to shrink if needed */
+    flex: 1;
+    min-width: 0;
   }
 }
 </style>
