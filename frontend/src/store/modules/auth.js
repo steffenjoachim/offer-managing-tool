@@ -29,7 +29,7 @@ const actions = {
   async login({ commit }, credentials) {
     try {
       const response = await axios.post(
-        "http://localhost:8000/api/auth/login/",
+        "http://localhost:8000/api/auth/token/",
         {
           username: credentials.username,
           password: credentials.password,
