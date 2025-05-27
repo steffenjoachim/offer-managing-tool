@@ -51,7 +51,7 @@ import { ElMessage } from "element-plus";
 import { UserFilled } from "@element-plus/icons-vue";
 
 export default {
-  name: "Login",
+  name: "LoginView",
   components: {
     UserFilled,
   },

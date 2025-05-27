@@ -1,3 +1,1 @@
-from . import settings, urls, wsgi
-
-from . import messaging 
+# This file makes this directory a Python package.

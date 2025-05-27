@@ -58,7 +58,7 @@ export default {
 
     const fetchListings = async () => {
       try {
-        const response = await axios.get("http://localhost:8000/api/listings/");
+        const response = await axios.get("http://localhost:8000/api/ads/");
         listings.value = response.data;
       } catch (error) {
         console.error("Error fetching listings:", error);
