@@ -160,15 +160,34 @@ export default {
       showMessageForm.value = !showMessageForm.value;
     };
 
-    const handleMessageSent = (messageData) => {
-      console.log("Message Data:", {
-        sender: "current_user", // This will be replaced with actual user data
-        recipient: listing.value.user,
-        content: messageData.content,
-        timestamp: new Date().toISOString(),
-        listingId: listingId,
-        listingTitle: listing.value.titel,
-      });
+    const handleMessageSent = async (messageData) => {
+      // console.log("Message Data:", {
+      //   sender: "current_user", // This will be replaced with actual user data
+      //   recipient: listing.value.user,
+      //   content: messageData.content,
+      //   timestamp: new Date().toISOString(),
+      //   listingId: listingId,
+      //   listingTitle: listing.value.titel,
+      // });
+
+      try {
+        const response = await axios.post(
+          "http://localhost:8000/api/messages/messages/send_message/",
+          {
+            listingId: listingId,
+            content: messageData.content,
+            // recipient wird im Backend basierend auf listingId ermittelt
+          }
+        );
+        console.log("Message sent successfully:", response.data);
+        // Optional: Erfolgsmeldung anzeigen
+        // ElMessage.success("Nachricht erfolgreich gesendet!"); // Benötigt ElMessage Import
+      } catch (error) {
+        console.error("Error sending message:", error);
+        // Optional: Fehlermeldung anzeigen
+        // ElMessage.error("Fehler beim Senden der Nachricht."); // Benötigt ElMessage Import
+      }
+
       showMessageForm.value = false;
     };
 

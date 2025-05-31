@@ -7,6 +7,14 @@ User = get_user_model()
 
 class Conversation(models.Model):
     participants = models.ManyToManyField(User, related_name='conversations')
+    listing = models.ForeignKey(
+        Anzeige,
+        on_delete=models.CASCADE,
+        related_name='conversations',
+        verbose_name='Anzeige',
+        null=True,
+        blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -14,7 +22,9 @@ class Conversation(models.Model):
         ordering = ['-updated_at']
 
     def __str__(self):
-        return f"Conversation {self.id}"
+        if self.listing:
+            return f"Konversation zu Anzeige {self.listing.titel} ({self.id})"
+        return f"Konversation {self.id}"
 
 class Message(models.Model):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')

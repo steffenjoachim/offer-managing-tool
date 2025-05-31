@@ -53,6 +53,56 @@ class MessageViewSet(viewsets.ModelViewSet):
         message.save()
         return Response(self.get_serializer(message).data)
 
+    @action(detail=False, methods=['post'])
+    def send_message(self, request):
+        """
+        Sendet eine neue Nachricht im Kontext einer Anzeige.
+        Erwartet: listingId, content, recipient (kann auch über listingId ermittelt werden)
+        """
+        listing_id = request.data.get('listingId')
+        content = request.data.get('content')
+        # recipient_username = request.data.get('recipient') # Optionale zusätzliche Validierung oder Ermittlung
+
+        if not listing_id or not content:
+            return Response({'detail': 'listingId und content sind erforderlich.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            anzeige = Anzeige.objects.get(id=listing_id)
+            sender = request.user
+            empfaenger = anzeige.user # Der Ersteller der Anzeige ist der Empfänger
+
+            # Finde oder erstelle eine Konversation für diese Anzeige zwischen Sender und Empfänger
+            # Berücksichtige beide Richtungen (Sender -> Empfänger und Empfänger -> Sender)
+            conversation = Conversation.objects.filter(
+                Q(participants=sender) & Q(participants=empfaenger),
+                listing=anzeige
+            ).first()
+
+            if not conversation:
+                # Erstelle eine neue Konversation, wenn keine existiert
+                conversation = Conversation.objects.create(listing=anzeige)
+                conversation.participants.add(sender, empfaenger)
+
+            # Erstelle die neue Nachricht
+            message = Message.objects.create(
+                conversation=conversation,
+                sender=sender,
+                empfaenger=empfaenger,
+                text=content,
+                # timestamp wird automatisch gesetzt
+            )
+
+            # Optional: Serialisiere die erstellte Nachricht und gib sie zurück
+            serializer = MessageSerializer(message)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except Anzeige.DoesNotExist:
+            return Response({'detail': 'Anzeige nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            # Loggen Sie den Fehler für Debugging
+            print(f"Fehler beim Senden der Nachricht: {e}")
+            return Response({'detail': 'Ein interner Fehler ist aufgetreten.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     # Optional: Aktion zum Abrufen von Nachrichten für eine bestimmte Anzeige
     @action(detail=False, methods=['get'])
     def by_anzeige(self, request):
