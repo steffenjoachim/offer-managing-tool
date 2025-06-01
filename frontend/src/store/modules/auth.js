@@ -6,7 +6,7 @@ const state = {
 };
 
 const getters = {
-  isLoggedIn: (state) => !!state.token,
+  isLoggedIn: (state) => !!state.user,
   username: (state) => state.user?.username || "",
   isAdmin: (state) => state.user?.isAdmin || false,
   accessToken: (state) => state.token,
@@ -28,20 +28,14 @@ const actions = {
 
   async login({ commit }, credentials) {
     try {
+      // 1. Login-Request an Backend
       const response = await axios.post(
         "http://localhost:8000/api/auth/login/",
-        {
-          username: credentials.username,
-          password: credentials.password,
-        }
+        credentials
       );
       const { access, refresh } = response.data;
 
-      // Store tokens in localStorage
-      localStorage.setItem("token", access);
-      localStorage.setItem("refresh", refresh);
-
-      // Fetch user details
+      // 2. User-Info holen
       const userResponse = await axios.get(
         "http://localhost:8000/api/auth/user/",
         {
@@ -50,51 +44,65 @@ const actions = {
           },
         }
       );
-
-      // Store user info
       const user = userResponse.data;
-      localStorage.setItem("user", JSON.stringify(user));
 
-      // Set axios default header
+      // 3. Tokens und User speichern
+      localStorage.setItem("access_token", access);
+      localStorage.setItem("refresh_token", refresh);
       axios.defaults.headers.common["Authorization"] = `Bearer ${access}`;
-
-      commit("SET_AUTH", { token: access, user });
-      return response.data;
+      commit("setUser", user);
+      commit("setAdmin", user.isAdmin);
+      commit("setTokens", { access, refresh });
+      return { user, tokens: { access, refresh } };
     } catch (error) {
       console.error("Login error:", error);
       throw error;
     }
   },
 
-  async logout({ commit }) {
-    try {
-      // Remove tokens from localStorage
-      localStorage.removeItem("token");
-      localStorage.removeItem("refresh");
-      localStorage.removeItem("user");
+  logout({ commit }) {
+    console.log("Auth Store: logout action called.");
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
 
-      // Remove axios default header
-      delete axios.defaults.headers.common["Authorization"];
+    delete axios.defaults.headers.common["Authorization"];
 
-      commit("CLEAR_AUTH");
-    } catch (error) {
-      console.error("Logout error:", error);
-      throw error;
-    }
+    commit("CLEAR_AUTH");
+    console.log("Auth Store: Auth data cleared from store.");
   },
 
-  async checkAuth({ commit }) {
-    try {
-      const token = localStorage.getItem("token");
-      const user = JSON.parse(localStorage.getItem("user"));
+  async checkAuth({ commit, dispatch }) {
+    console.log("Auth Store: checkAuth action called.");
+    const accessToken = localStorage.getItem("access_token");
+    const refreshToken = localStorage.getItem("refresh_token");
 
-      if (token && user) {
-        // Set axios default header
-        axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-        commit("SET_AUTH", { token, user });
+    if (accessToken && refreshToken) {
+      console.log("Auth Store: Tokens found in localStorage.");
+      axios.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
+
+      try {
+        const response = await axios.get(
+          "http://localhost:8000/api/auth/user/"
+        );
+        const user = response.data;
+        console.log("Auth Store: User data fetched from backend:", user);
+        commit("setUser", user);
+        commit("setAdmin", user.is_admin || false);
+        commit("setTokens", { access: accessToken, refresh: refreshToken });
+        console.log(
+          "Auth Store: User and tokens set in store after checkAuth."
+        );
+      } catch (error) {
+        console.error(
+          "Auth Store: Error fetching user data during checkAuth:",
+          error
+        );
+        dispatch("logout");
       }
-    } catch (error) {
-      console.error("Check auth error:", error);
+    } else {
+      console.log(
+        "Auth Store: No tokens found in localStorage. User not logged in."
+      );
       commit("CLEAR_AUTH");
     }
   },
@@ -104,10 +112,22 @@ const mutations = {
   SET_AUTH(state, { token, user }) {
     state.token = token;
     state.user = user;
+    console.log("Auth Store Mutation: SET_AUTH called with user:", user);
   },
   CLEAR_AUTH(state) {
     state.token = null;
     state.user = null;
+    console.log("Auth Store Mutation: CLEAR_AUTH called.");
+  },
+  setUser(state, user) {
+    state.user = user;
+    console.log("Auth Store Mutation: setUser called with user:", user);
+  },
+  setAdmin(state, value) {
+    state.isAdmin = value;
+  },
+  setTokens(state, tokens) {
+    state.tokens = tokens;
   },
 };
 

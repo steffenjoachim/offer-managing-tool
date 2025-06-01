@@ -33,6 +33,22 @@ class ConversationViewSet(viewsets.ModelViewSet):
         conversation.participants.add(user)
         return Response(self.get_serializer(conversation).data)
 
+    @action(detail=True, methods=['post'])
+    def mark_as_read(self, request, pk=None):
+        """
+        Marks all unread messages in a conversation for the requesting user as read.
+        """
+        conversation = self.get_object()
+        # Markieren Sie alle Nachrichten in dieser Konversation, die NICHT vom anfragenden Benutzer gesendet wurden
+        # und noch nicht gelesen sind, als gelesen.
+        messages_to_mark = conversation.messages.filter(
+            is_read=False,
+            empfaenger=request.user # Nur Nachrichten markieren, wo der aktuelle Benutzer der Empfänger ist
+        )
+        count_updated = messages_to_mark.update(is_read=True)
+        
+        return Response({'status': f'{count_updated} messages marked as read'})
+
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
