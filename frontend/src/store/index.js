@@ -2,11 +2,13 @@ import { createStore } from "vuex";
 import axios from "axios";
 import auth from "./modules/auth";
 import listings from "./modules/listings";
+import messages from "./modules/messages";
 
 export default createStore({
   modules: {
     auth,
     listings,
+    messages,
   },
   state: {
     isAdmin: false,
@@ -83,8 +85,9 @@ export default createStore({
     },
   },
   getters: {
-    isLoggedIn: (state) => !!state.user,
-    isAdmin: (state) => state.isAdmin,
-    currentUser: (state) => state.user,
+    isLoggedIn: (state, getters) => getters["auth/isLoggedIn"],
+    username: (state, getters) => getters["auth/username"],
+    isAdmin: (state, getters) => getters["auth/isAdmin"],
+    currentUser: (state, getters) => getters["auth/currentUser"],
   },
 });

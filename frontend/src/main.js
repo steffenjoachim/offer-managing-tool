@@ -29,7 +29,16 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 
 // app.use(i18n);
 app.use(store);
-app.use(router);
-app.use(ElementPlus);
 
-app.mount("#app");
+// Ensure auth check is done before mounting the app and router
+store
+  .dispatch("auth/checkAuth")
+  .then(() => {
+    app.use(router);
+    app.use(ElementPlus);
+    app.mount("#app");
+  })
+  .catch((error) => {
+    console.error("Failed to initialize authentication:", error);
+    // Optionally handle the error, e.g., redirect to a generic error page
+  });

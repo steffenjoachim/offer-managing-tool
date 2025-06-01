@@ -3,6 +3,7 @@ import Home from "../views/Home.vue";
 import Login from "../views/Login.vue";
 import Register from "../views/Register.vue";
 import CreateListing from "../views/CreateListing.vue";
+import Messages from "../views/Messages.vue";
 import store from "../store";
 
 const routes = [
@@ -27,6 +28,12 @@ const routes = [
     path: "/create-listing",
     name: "CreateListing",
     component: CreateListing,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/my-messages",
+    name: "Messages",
+    component: Messages,
     meta: { requiresAuth: true },
   },
   {
