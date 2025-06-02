@@ -94,6 +94,8 @@ export default {
           username: form.username,
           password: form.password,
         });
+        await store.dispatch("auth/checkAuth");
+        await store.dispatch("messages/fetchConversations");
 
         ElMessage.success("Login successful!");
         router.push("/");

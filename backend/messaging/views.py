@@ -63,21 +63,29 @@ class MessageViewSet(viewsets.ModelViewSet):
         serializer.save(sender=self.request.user, conversation=conversation)
 
     @action(detail=True, methods=['post'])
-    def mark_as_read(self, request, pk=None, conversation_pk=None):
-        message = self.get_object()
-        message.is_read = True
-        message.save()
-        return Response(self.get_serializer(message).data)
+    def mark_as_read(self, request, pk=None):
+        """
+        Marks all unread messages in a conversation for the requesting user as read.
+        """
+        conversation = self.get_object()
+        # Markieren Sie alle Nachrichten in dieser Konversation, die NICHT vom anfragenden Benutzer gesendet wurden
+        # und noch nicht gelesen sind, als gelesen.
+        messages_to_mark = conversation.messages.filter(
+            is_read=False,
+            empfaenger=request.user # Nur Nachrichten markieren, wo der aktuelle Benutzer der Empfänger ist
+        )
+        count_updated = messages_to_mark.update(is_read=True)
+
+        return Response({'status': f'{count_updated} messages marked as read'})
 
     @action(detail=False, methods=['post'])
     def send_message(self, request):
         """
         Sendet eine neue Nachricht im Kontext einer Anzeige.
-        Erwartet: listingId, content, recipient (kann auch über listingId ermittelt werden)
+        Erwartet: listingId, content.
         """
         listing_id = request.data.get('listingId')
         content = request.data.get('content')
-        # recipient_username = request.data.get('recipient') # Optionale zusätzliche Validierung oder Ermittlung
 
         if not listing_id or not content:
             return Response({'detail': 'listingId und content sind erforderlich.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -85,30 +93,42 @@ class MessageViewSet(viewsets.ModelViewSet):
         try:
             anzeige = Anzeige.objects.get(id=listing_id)
             sender = request.user
-            empfaenger = anzeige.user # Der Ersteller der Anzeige ist der Empfänger
 
-            # Finde oder erstelle eine Konversation für diese Anzeige zwischen Sender und Empfänger
-            # Berücksichtige beide Richtungen (Sender -> Empfänger und Empfänger -> Sender)
-            conversation = Conversation.objects.filter(
-                Q(participants=sender) & Q(participants=empfaenger),
-                listing=anzeige
-            ).first()
+            # Die beiden Kernparteien sind der Sender und der Ersteller der Anzeige.
+            user1 = sender
+            user2 = anzeige.user
 
-            if not conversation:
-                # Erstelle eine neue Konversation, wenn keine existiert
-                conversation = Conversation.objects.create(listing=anzeige)
-                conversation.participants.add(sender, empfaenger)
+            # 1. Finde oder erstelle Konversation, die mit dieser Anzeige verknüpft ist.
+            conversation, created = Conversation.objects.get_or_create(listing=anzeige)
+
+            # 2. Füge beide Kernparteien als Teilnehmer hinzu (add ist idempotent).
+            conversation.participants.add(user1, user2)
+
+            # 3. Bestimme den Empfänger basierend auf den Teilnehmern der Konversation.
+            # Wenn der Sender der Ersteller der Anzeige ist:
+            if sender == anzeige.user:
+                # Finde den anderen Teilnehmer in der Konversation.
+                other_participants = conversation.participants.exclude(id=sender.id)
+                if other_participants.exists():
+                    empfaenger = other_participants.first()
+                else:
+                    # Dieser Fall sollte seltener auftreten, wenn beide immer als Participants hinzugefügt werden.
+                    print(f"Fehler: Konversation {conversation.id} hat keinen anderen Teilnehmer als den Sender {sender.username} nach Hinzufügen der Teilnehmer.")
+                    return Response({'detail': 'Konnte den Empfänger der Nachricht nicht bestimmen (Teilnehmerproblem).'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            else:
+                # Der Sender ist NICHT der Ersteller der Anzeige. Der Empfänger ist der Ersteller der Anzeige.
+                empfaenger = anzeige.user
 
             # Erstelle die neue Nachricht
             message = Message.objects.create(
                 conversation=conversation,
                 sender=sender,
-                empfaenger=empfaenger,
+                empfaenger=empfaenger, # Der korrekt bestimmte Empfänger
                 text=content,
                 # timestamp wird automatisch gesetzt
             )
 
-            # Optional: Serialisiere die erstellte Nachricht und gib sie zurück
+            # Serialisiere die erstellte Nachricht und gib sie zurück
             serializer = MessageSerializer(message)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -119,26 +139,49 @@ class MessageViewSet(viewsets.ModelViewSet):
             print(f"Fehler beim Senden der Nachricht: {e}")
             return Response({'detail': 'Ein interner Fehler ist aufgetreten.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Optional: Aktion zum Abrufen von Nachrichten für eine bestimmte Anzeige
     @action(detail=False, methods=['get'])
     def by_anzeige(self, request):
         # Gibt Nachrichten zurück, die sich auf eine bestimmte Anzeige beziehen
         anzeige_id = request.query_params.get('anzeige_id', None)
         if not anzeige_id:
             return Response({'detail': 'Bitte geben Sie eine anzeige_id an.'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Stelle sicher, dass der Benutzer berechtigt ist, die Nachrichten dieser Anzeige zu sehen
-        # (entweder Ersteller der Anzeige oder Absender/Empfänger einer Nachricht bzgl. dieser Anzeige)
+
         try:
             anzeige = Anzeige.objects.get(id=anzeige_id)
-            # Benutzer ist Ersteller der Anzeige ODER
-            # Benutzer hat Nachrichten bzgl. dieser Anzeige
-            if anzeige.user == request.user or Message.objects.filter(anzeige=anzeige, sender=request.user).exists() or Message.objects.filter(anzeige=anzeige, empfaenger=request.user).exists():
-                messages = self.get_queryset().filter(anzeige=anzeige).order_by('timestamp')
-                serializer = self.get_serializer(messages, many=True)
-                return Response(serializer.data)
+            # Stelle sicher, dass der Benutzer berechtigt ist
+            if anzeige.user == request.user or Conversation.objects.filter(listing=anzeige, participants=request.user).exists():
+                # Finde die Konversation für diese Anzeige und den aktuellen Benutzer
+                conversation = Conversation.objects.filter(listing=anzeige, participants=request.user).first()
+                if conversation:
+                     messages = Message.objects.filter(conversation=conversation).order_by('timestamp')
+                     serializer = self.get_serializer(messages, many=True)
+                     return Response(serializer.data)
+                else:
+                     return Response({'detail': 'Keine Konversation für diese Anzeige gefunden.'}, status=status.HTTP_404_NOT_FOUND)
+
             else:
                  return Response({'detail': 'Sie sind nicht berechtigt, Nachrichten für diese Anzeige anzuzeigen.'}, status=status.HTTP_403_FORBIDDEN)
 
         except Anzeige.DoesNotExist:
             return Response({'detail': 'Anzeige nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=True, methods=['get'])
+    def messages(self, request, pk=None):
+        conversation = get_object_or_404(Conversation, pk=pk)
+        # Stelle sicher, dass der Benutzer Teilnehmer der Konversation ist
+        if request.user in conversation.participants.all():
+            messages = Message.objects.filter(conversation=conversation).order_by('timestamp')
+            serializer = self.get_serializer(messages, many=True)
+            return Response(serializer.data)
+        else:
+            return Response({'detail': 'Sie sind kein Teilnehmer dieser Konversation.'}, status=status.HTTP_403_FORBIDDEN)
+
+    @action(detail=True, methods=['delete'])
+    def delete(self, request, pk=None):
+         conversation = get_object_or_404(Conversation, pk=pk)
+         # Nur Teilnehmer der Konversation dürfen sie löschen
+         if request.user in conversation.participants.all():
+             conversation.delete()
+             return Response(status=status.HTTP_204_NO_CONTENT)
+         else:
+             return Response({'detail': 'Sie sind nicht berechtigt, diese Konversation zu löschen.'}, status=status.HTTP_403_FORBIDDEN)

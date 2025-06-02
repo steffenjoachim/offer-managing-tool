@@ -22,19 +22,16 @@ class ConversationSerializer(serializers.ModelSerializer):
     participants = UserSerializer(many=True, read_only=True)
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
+    listing = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
-        fields = ['id', 'participants', 'created_at', 'updated_at', 'last_message', 'unread_count']
+        fields = ['id', 'participants', 'created_at', 'updated_at', 'last_message', 'unread_count', 'listing']
 
     def get_last_message(self, obj):
         last_message = obj.messages.order_by('-timestamp').first()
         if last_message:
-            return {
-                'text': last_message.text,
-                'timestamp': last_message.timestamp,
-                'sender': UserSerializer(last_message.sender).data
-            }
+            return MessageSerializer(last_message).data
         return None
 
     def get_unread_count(self, obj):
@@ -42,6 +39,14 @@ class ConversationSerializer(serializers.ModelSerializer):
         if user.is_authenticated:
             return obj.messages.filter(empfaenger=user, is_read=False).count()
         return 0
+
+    def get_listing(self, obj):
+        if obj.listing:
+            return {
+                'id': obj.listing.id,
+                'title': getattr(obj.listing, 'titel', getattr(obj.listing, 'title', ''))
+            }
+        return None
 
 class MessageCreateSerializer(serializers.ModelSerializer):
     # Serializer zum Erstellen von Nachrichten
