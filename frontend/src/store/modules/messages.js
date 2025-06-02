@@ -92,6 +92,13 @@ const actions = {
       throw error;
     }
   },
+
+  async deleteConversation({ dispatch }, conversationId) {
+    await axios.delete(
+      `http://127.0.0.1:8000/api/messages/conversations/${conversationId}/`
+    );
+    await dispatch("fetchConversations");
+  },
 };
 
 const mutations = {
