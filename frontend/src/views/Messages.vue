@@ -133,8 +133,6 @@ export default {
 
     const isLoggedIn = computed(() => store.getters["auth/isLoggedIn"]);
 
-    const isReadyToDisplayList = ref(false);
-
     const conversations = computed(() => {
       console.log(
         "Computed conversations evaluated:",
@@ -149,25 +147,27 @@ export default {
         "Computed currentUser evaluated:",
         store.getters["auth/currentUser"]
       );
-      return store.getters["auth/currentUser"] || null;
+      // Ensure currentUser is reactive to changes in the store
+      return store.getters["auth/currentUser"];
     });
 
     const conversationDisplayTexts = computed(() => {
       console.log(
         "Computed conversationDisplayTexts evaluated:",
-        "isReadyToDisplayList:",
-        isReadyToDisplayList.value,
         "Conversations:",
         conversations.value?.length
       );
+
+      // Return empty array immediately if no conversations or currentUser is not available
       if (
-        !isReadyToDisplayList.value ||
         !conversations.value ||
-        conversations.value.length === 0
+        conversations.value.length === 0 ||
+        currentUser.value === null
       ) {
         return [];
       }
 
+      // Now that we know currentUser is not null, it's safe to access its properties
       const currentUserId = currentUser.value.id;
 
       return conversations.value.map((conversation) => {
@@ -194,6 +194,33 @@ export default {
       });
     });
 
+    // Flag to prevent fetching conversations multiple times
+    const hasFetchedConversations = ref(false); // Resetting to a simpler flag
+
+    // Watch for changes in isLoggedIn and currentUser, mainly to handle logout
+    watch([isLoggedIn, currentUser], ([newIsLoggedIn, newUser]) => {
+      console.log(
+        "currentUser or isLoggedIn watched:",
+        "newUser:",
+        newUser,
+        "newIsLoggedIn:",
+        newIsLoggedIn,
+        "hasFetchedConversations:",
+        hasFetchedConversations.value
+      );
+
+      if (!newIsLoggedIn || !newUser) {
+        // If user logs out or currentUser becomes null/undefined, reset state
+        console.log(
+          "User logged out or user object became null/undefined, resetting fetched flag."
+        );
+        hasFetchedConversations.value = false;
+        // Optionally clear conversations from store here if needed on logout
+        // store.commit("messages/SET_CONVERSATIONS", []);
+      }
+      // Initial fetching is handled in onMounted now
+    });
+
     const currentDisplayState = computed(() => {
       console.log(
         "Computed currentDisplayState evaluated:",
@@ -201,32 +228,56 @@ export default {
         loading.value,
         "error:",
         error.value,
-        "isReadyToDisplayList:",
-        isReadyToDisplayList.value,
+        "isLoggedIn:",
+        isLoggedIn.value,
+        "currentUser:",
+        currentUser.value !== null, // Check if currentUser is not null/undefined
         "conversations.length:",
         conversations.value?.length
       );
 
+      // 1. Priority: Loading State
+      // Show loading if the message store is loading OR if user is logged in but currentUser object is not yet available
+      // We also show loading if the user is logged in but conversations haven't been fetched yet
+      if (
+        loading.value ||
+        (isLoggedIn.value && currentUser.value === null) ||
+        (isLoggedIn.value && !hasFetchedConversations.value)
+      ) {
+        console.log(
+          "Display state is loading due to loading state, missing currentUser, or conversations not yet fetched for logged in user."
+        );
+        return "loading";
+      }
+
+      // 2. Priority: Error State
       if (error.value) {
+        console.log("Display state is error.");
         return "error";
       }
 
-      if (loading.value) {
-        return "loading";
+      // 3. Priority: User not logged in (should be handled by router guard, but as a fallback)
+      if (!isLoggedIn.value) {
+        console.log(
+          "Display state is loading because user is not logged in (should be handled by router guard)."
+        );
+        return "loading"; // Or potentially a different state if app allows visiting this page when logged out
       }
 
-      if (!isReadyToDisplayList.value) {
-        return "loading";
-      }
-
+      // 4. Priority: Messages available
       if (conversations.value?.length > 0) {
+        console.log("Display state is list.");
         return "list";
       }
 
+      // 5. Last Priority: No messages
       if (conversations.value?.length === 0) {
+        console.log("Display state is no-messages.");
         return "no-messages";
       }
 
+      // Fallback for unexpected states
+      console.log("Display state is fallback loading.");
       return "loading";
     });
 
@@ -316,59 +367,24 @@ export default {
       }
     };
 
-    watch(
-      [currentUser, isLoggedIn],
-      ([newUser, newIsLoggedIn], [oldUser, oldIsLoggedIn]) => {
-        console.log(
-          "currentUser or isLoggedIn watched:",
-          "oldUser:",
-          oldUser,
-          "newUser:",
-          newUser,
-          "oldIsLoggedIn:",
-          oldIsLoggedIn,
-          "newIsLoggedIn:",
-          newIsLoggedIn
-        );
-
-        if (newUser || newIsLoggedIn === false) {
-          console.log(
-            "User state determined (User exists or not logged in), setting isReadyToDisplayList to true"
-          );
-          isReadyToDisplayList.value = true;
-        } else {
-          console.log(
-            "User state still pending (isLoggedIn is true, but user object is null), setting isReadyToDisplayList to false"
-          );
-          isReadyToDisplayList.value = false;
-        }
-
-        if (newUser && !oldUser) {
-          console.log("New user detected, fetching conversations.");
-          fetchConversations();
-        }
-
-        if (!newUser && oldUser) {
-          console.log("User logged out, clearing conversations (optional).");
-          // store.commit('messages/SET_CONVERSATIONS', []);
-        }
-      },
-      { immediate: true }
-    );
-
     onMounted(() => {
-      console.log("onMounted: Initialization complete, watcher is active.");
+      console.log("onMounted: Initialization complete.");
+      // On mount, check if the user is already logged in and the user object is available
+      // If so, and conversations haven't been fetched yet, fetch them.
       if (
-        (currentUser.value || isLoggedIn.value === false) &&
-        !isReadyToDisplayList.value
+        isLoggedIn.value &&
+        currentUser.value !== null &&
+        !hasFetchedConversations.value
       ) {
         console.log(
-          "onMounted check: User state determined, setting isReadyToDisplayList to true and fetching if logged in."
+          "onMounted: User is logged in and user object available, fetching conversations."
         );
-        isReadyToDisplayList.value = true;
-        if (currentUser.value) {
-          fetchConversations();
-        }
+        fetchConversations();
+        hasFetchedConversations.value = true; // Set flag after initiating fetch
+      } else {
+        console.log(
+          "onMounted: User not logged in or currentUser not available yet, or conversations already fetched."
+        );
       }
     });
 
@@ -382,7 +398,6 @@ export default {
       isLoggedIn,
       currentUser,
       conversationDisplayTexts,
-      isReadyToDisplayList,
       deleteDialogVisible,
       conversationToDelete,
       confirmDelete,
