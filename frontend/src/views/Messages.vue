@@ -35,9 +35,6 @@
         class="conversations-list"
       >
         <el-scrollbar height="calc(100vh - 200px)">
-          <div style="font-size: 10px; color: purple">
-            Debug conversationDisplayTexts: {{ conversationDisplayTexts }}
-          </div>
           <div
             v-for="(conversation, index) in conversations"
             :key="conversation.id"
@@ -51,10 +48,7 @@
                   {{ conversation.listing ? conversation.listing.title : "" }}
                 </div>
                 <div class="sender-info">
-                  {{ conversationDisplayTexts[index] }}
-                  <span style="font-size: 10px; color: brown">
-                    (Debug text: {{ conversationDisplayTexts[index] }})
-                  </span>
+                  {{ conversationDisplayTextsLocal[index] }}
                 </div>
               </div>
               <div class="header-right">
@@ -113,7 +107,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, watch } from "vue";
+import { ref, onMounted, computed, watch, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { Message } from "@element-plus/icons-vue";
@@ -143,55 +137,90 @@ export default {
     });
 
     const currentUser = computed(() => {
+      const user = store.getters["auth/currentUser"];
       console.log(
         "Computed currentUser evaluated:",
-        store.getters["auth/currentUser"]
+        user ? { id: user.id, username: user.username } : user
       );
-      // Ensure currentUser is reactive to changes in the store
-      return store.getters["auth/currentUser"];
+      return user;
     });
 
-    const conversationDisplayTexts = computed(() => {
-      console.log(
-        "Computed conversationDisplayTexts evaluated:",
-        "Conversations:",
-        conversations.value?.length
-      );
+    // New reactive variable to hold display texts
+    const conversationDisplayTextsLocal = ref([]);
 
-      // Return empty array immediately if no conversations or currentUser is not available
+    // New computed property to calculate display texts based on conversations and currentUser
+    const calculatedConversationDisplayTexts = computed(() => {
+      // Check if both conversations and user are available before calculating display texts
       if (
-        !conversations.value ||
-        conversations.value.length === 0 ||
-        currentUser.value === null
+        conversations.value &&
+        conversations.value.length > 0 &&
+        currentUser.value
       ) {
-        return [];
+        console.log(
+          "calculatedConversationDisplayTexts: Condition met for calculation. Data available."
+        );
+        const currentUserId = currentUser.value.id;
+        return conversations.value.map((conversation) => {
+          if (!conversation.last_message) {
+            console.warn(
+              "calculatedConversationDisplayTexts: Conversation without last message:",
+              conversation
+            );
+            return "";
+          }
+
+          const senderId = Number(conversation.last_message.sender?.id);
+
+          if (
+            isNaN(senderId) ||
+            typeof conversation.last_message.sender?.id === "undefined"
+          ) {
+            console.warn(
+              "calculatedConversationDisplayTexts: Invalid or missing sender ID in last message for conversation",
+              conversation.id,
+              "Sender data:",
+              conversation.last_message.sender
+            );
+            return "";
+          }
+
+          if (senderId === currentUserId) {
+            const recipientUsername =
+              conversation.last_message.empfaenger?.username ||
+              "Empfänger unbekannt";
+            console.log(
+              "calculatedConversationDisplayTexts: Message from current user. Recipient:",
+              recipientUsername
+            );
+            return `to: ${recipientUsername}`;
+          } else {
+            const senderUsername =
+              conversation.last_message.sender?.username || "Sender unbekannt";
+            console.log(
+              "calculatedConversationDisplayTexts: Message from other user. Sender:",
+              senderUsername
+            );
+            return `sender: ${senderUsername}`;
+          }
+        });
+      } else {
+        console.log(
+          "calculatedConversationDisplayTexts: Condition NOT met for calculation. Clearing display texts. Conversations length:",
+          conversations.value?.length,
+          "CurrentUser:",
+          currentUser.value ? "Available" : "Undefined/Null"
+        );
+        // Return an empty array or null when conditions are not met
+        return []; // Or null, depending on how you want to handle the intermediate state
       }
+    });
 
-      // Now that we know currentUser is not null, it's safe to access its properties
-      const currentUserId = currentUser.value.id;
-
-      return conversations.value.map((conversation) => {
-        if (!conversation.last_message) {
-          return "";
-        }
-
-        const senderId = Number(conversation.last_message.sender?.id);
-
-        if (isNaN(senderId)) {
-          return "";
-        }
-
-        if (senderId === currentUserId) {
-          const recipientUsername =
-            conversation.last_message.empfaenger?.username ||
-            "Empfänger unbekannt";
-          return `to: ${recipientUsername}`;
-        } else {
-          const senderUsername =
-            conversation.last_message.sender?.username || "Sender unbekannt";
-          return `sender: ${senderUsername}`;
-        }
-      });
+    // Watch conversations and currentUser indirectly by watching calculatedConversationDisplayTexts
+    watch(calculatedConversationDisplayTexts, (newDisplayTexts) => {
+      console.log("Watch effect triggered by calculatedConversationDisplayTexts.");
+        // Update the local reactive variable with the calculated texts
+        conversationDisplayTextsLocal.value = newDisplayTexts;
+        console.log("conversationDisplayTextsLocal updated:", conversationDisplayTextsLocal.value);
     });
 
     // Flag to prevent fetching conversations multiple times
@@ -397,7 +426,7 @@ export default {
       openConversation,
       isLoggedIn,
       currentUser,
-      conversationDisplayTexts,
+      conversationDisplayTextsLocal,
       deleteDialogVisible,
       conversationToDelete,
       confirmDelete,

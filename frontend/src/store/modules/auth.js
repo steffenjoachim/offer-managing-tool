@@ -10,6 +10,7 @@ const getters = {
   username: (state) => state.user?.username || "",
   isAdmin: (state) => state.user?.isAdmin || false,
   accessToken: (state) => state.token,
+  currentUser: (state) => state.user,
 };
 
 const actions = {

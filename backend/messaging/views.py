@@ -112,9 +112,11 @@ class MessageViewSet(viewsets.ModelViewSet):
                 if other_participants.exists():
                     empfaenger = other_participants.first()
                 else:
-                    # Dieser Fall sollte seltener auftreten, wenn beide immer als Participants hinzugefügt werden.
-                    print(f"Fehler: Konversation {conversation.id} hat keinen anderen Teilnehmer als den Sender {sender.username} nach Hinzufügen der Teilnehmer.")
-                    return Response({'detail': 'Konnte den Empfänger der Nachricht nicht bestimmen (Teilnehmerproblem).'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    # Dieser Fall tritt auf, wenn der Sender der Ersteller der Anzeige ist
+                    # und noch kein anderer Teilnehmer der Konversation hinzugefügt wurde.
+                    # Dies sollte verhindert werden, da der Ersteller keine Nachricht an sich selbst senden kann.
+                    print(f"Versuch, Nachricht als Anzeigen-Ersteller {sender.username} zu senden, aber kein anderer Teilnehmer in Konversation {conversation.id} gefunden.")
+                    return Response({'detail': 'Sie können keine Nachricht an sich selbst senden, solange kein anderer Benutzer eine Konversation initiiert hat.'}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 # Der Sender ist NICHT der Ersteller der Anzeige. Der Empfänger ist der Ersteller der Anzeige.
                 empfaenger = anzeige.user
@@ -137,7 +139,9 @@ class MessageViewSet(viewsets.ModelViewSet):
         except Exception as e:
             # Loggen Sie den Fehler für Debugging
             print(f"Fehler beim Senden der Nachricht: {e}")
-            return Response({'detail': 'Ein interner Fehler ist aufgetreten.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # Hier wird ein allgemeiner 500-Fehler zurückgegeben, der die genaue Ursache verschleiert.
+            # Wir sollten sicherstellen, dass spezifischere Fehler vorher abgefangen werden.
+            return Response({'detail': 'Ein interner Serverfehler ist beim Senden der Nachricht aufgetreten.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=['get'])
     def by_anzeige(self, request):
