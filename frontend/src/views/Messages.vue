@@ -53,13 +53,7 @@
               </div>
               <div class="header-right">
                 <span class="timestamp">
-                  {{
-                    formatDate(
-                      conversation.last_message
-                        ? conversation.last_message.timestamp
-                        : null
-                    )
-                  }}
+                  {{ formatDate(conversation.last_message?.timestamp || null) }}
                 </span>
               </div>
             </div>
@@ -128,20 +122,11 @@ export default {
     const isLoggedIn = computed(() => store.getters["auth/isLoggedIn"]);
 
     const conversations = computed(() => {
-      console.log(
-        "Computed conversations evaluated:",
-        "Store data length:",
-        store.getters["messages/allConversations"]?.length
-      );
       return store.getters["messages/allConversations"];
     });
 
     const currentUser = computed(() => {
       const user = store.getters["auth/currentUser"];
-      console.log(
-        "Computed currentUser evaluated:",
-        user ? { id: user.id, username: user.username } : user
-      );
       return user;
     });
 
@@ -156,16 +141,9 @@ export default {
         conversations.value.length > 0 &&
         currentUser.value
       ) {
-        console.log(
-          "calculatedConversationDisplayTexts: Condition met for calculation. Data available."
-        );
         const currentUserId = currentUser.value.id;
         return conversations.value.map((conversation) => {
           if (!conversation.last_message) {
-            console.warn(
-              "calculatedConversationDisplayTexts: Conversation without last message:",
-              conversation
-            );
             return "";
           }
 
@@ -175,12 +153,6 @@ export default {
             isNaN(senderId) ||
             typeof conversation.last_message.sender?.id === "undefined"
           ) {
-            console.warn(
-              "calculatedConversationDisplayTexts: Invalid or missing sender ID in last message for conversation",
-              conversation.id,
-              "Sender data:",
-              conversation.last_message.sender
-            );
             return "";
           }
 
@@ -188,28 +160,14 @@ export default {
             const recipientUsername =
               conversation.last_message.empfaenger?.username ||
               "Empfänger unbekannt";
-            console.log(
-              "calculatedConversationDisplayTexts: Message from current user. Recipient:",
-              recipientUsername
-            );
             return `to: ${recipientUsername}`;
           } else {
             const senderUsername =
               conversation.last_message.sender?.username || "Sender unbekannt";
-            console.log(
-              "calculatedConversationDisplayTexts: Message from other user. Sender:",
-              senderUsername
-            );
             return `sender: ${senderUsername}`;
           }
         });
       } else {
-        console.log(
-          "calculatedConversationDisplayTexts: Condition NOT met for calculation. Clearing display texts. Conversations length:",
-          conversations.value?.length,
-          "CurrentUser:",
-          currentUser.value ? "Available" : "Undefined/Null"
-        );
         // Return an empty array or null when conditions are not met
         return []; // Or null, depending on how you want to handle the intermediate state
       }
@@ -217,10 +175,8 @@ export default {
 
     // Watch conversations and currentUser indirectly by watching calculatedConversationDisplayTexts
     watch(calculatedConversationDisplayTexts, (newDisplayTexts) => {
-      console.log("Watch effect triggered by calculatedConversationDisplayTexts.");
-        // Update the local reactive variable with the calculated texts
-        conversationDisplayTextsLocal.value = newDisplayTexts;
-        console.log("conversationDisplayTextsLocal updated:", conversationDisplayTextsLocal.value);
+      // Update the local reactive variable with the calculated texts
+      conversationDisplayTextsLocal.value = newDisplayTexts;
     });
 
     // Flag to prevent fetching conversations multiple times
@@ -228,21 +184,8 @@ export default {
 
     // Watch for changes in isLoggedIn and currentUser, mainly to handle logout
     watch([isLoggedIn, currentUser], ([newIsLoggedIn, newUser]) => {
-      console.log(
-        "currentUser or isLoggedIn watched:",
-        "newUser:",
-        newUser,
-        "newIsLoggedIn:",
-        newIsLoggedIn,
-        "hasFetchedConversations:",
-        hasFetchedConversations.value
-      );
-
       if (!newIsLoggedIn || !newUser) {
         // If user logs out or currentUser becomes null/undefined, reset state
-        console.log(
-          "User logged out or user object became null/undefined, resetting fetched flag."
-        );
         hasFetchedConversations.value = false;
         // Optionally clear conversations from store here if needed on logout
         // store.commit("messages/SET_CONVERSATIONS", []);
@@ -251,20 +194,6 @@ export default {
     });
 
     const currentDisplayState = computed(() => {
-      console.log(
-        "Computed currentDisplayState evaluated:",
-        "loading:",
-        loading.value,
-        "error:",
-        error.value,
-        "isLoggedIn:",
-        isLoggedIn.value,
-        "currentUser:",
-        currentUser.value !== null, // Check if currentUser is not null/undefined
-        "conversations.length:",
-        conversations.value?.length
-      );
-
       // 1. Priority: Loading State
       // Show loading if the message store is loading OR if user is logged in but currentUser object is not yet available
       // We also show loading if the user is logged in but conversations haven't been fetched yet
@@ -273,40 +202,30 @@ export default {
         (isLoggedIn.value && currentUser.value === null) ||
         (isLoggedIn.value && !hasFetchedConversations.value)
       ) {
-        console.log(
-          "Display state is loading due to loading state, missing currentUser, or conversations not yet fetched for logged in user."
-        );
         return "loading";
       }
 
       // 2. Priority: Error State
       if (error.value) {
-        console.log("Display state is error.");
         return "error";
       }
 
       // 3. Priority: User not logged in (should be handled by router guard, but as a fallback)
       if (!isLoggedIn.value) {
-        console.log(
-          "Display state is loading because user is not logged in (should be handled by router guard)."
-        );
         return "loading"; // Or potentially a different state if app allows visiting this page when logged out
       }
 
       // 4. Priority: Messages available
       if (conversations.value?.length > 0) {
-        console.log("Display state is list.");
         return "list";
       }
 
       // 5. Last Priority: No messages
       if (conversations.value?.length === 0) {
-        console.log("Display state is no-messages.");
         return "no-messages";
       }
 
       // Fallback for unexpected states
-      console.log("Display state is fallback loading.");
       return "loading";
     });
 

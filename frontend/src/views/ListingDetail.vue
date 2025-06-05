@@ -33,17 +33,20 @@
             class="additional-images-container"
             v-if="listing.bilder && listing.bilder.length > 1"
           >
-            <div class="additional-images-list" ref="additionalImagesList">
-              <div
-                v-for="(image, index) in listing.bilder.slice(1)"
-                :key="index"
-                class="thumbnail-container"
-              >
-                <img
-                  :src="image.bild"
-                  alt="Listing Thumbnail"
-                  class="thumbnail-image"
-                />
+            <!-- Wrapper for overflow hidden -->
+            <div class="additional-images-wrapper">
+              <div class="additional-images-list" ref="additionalImagesList">
+                <div
+                  v-for="(image, index) in listing.bilder.slice(1)"
+                  :key="index"
+                  class="thumbnail-container"
+                >
+                  <img
+                    :src="image.bild"
+                    alt="Listing Thumbnail"
+                    class="thumbnail-image"
+                  />
+                </div>
               </div>
             </div>
             <!-- Navigation Arrows -->
@@ -147,7 +150,18 @@ export default {
     const scrollAdditionalImages = (direction) => {
       if (additionalImagesList.value) {
         const list = additionalImagesList.value;
-        const scrollAmount = 200; // Adjust scroll amount as needed
+        // Calculate scroll amount based on thumbnail width and margin
+        const thumbnailElement = list.querySelector(".thumbnail-container");
+        if (!thumbnailElement) return; // Should not happen if images are present
+
+        const thumbnailWidth = thumbnailElement.offsetWidth; // includes padding and border if any
+        const thumbnailMarginRight = parseInt(
+          window.getComputedStyle(thumbnailElement).marginRight,
+          10
+        );
+
+        const scrollAmount = thumbnailWidth + thumbnailMarginRight;
+
         if (direction === "left") {
           list.scrollLeft -= scrollAmount;
         } else if (direction === "right") {
@@ -302,11 +316,15 @@ export default {
   align-items: center;
 }
 
+.additional-images-wrapper {
+  overflow: hidden;
+  width: 100%;
+}
+
 .additional-images-list {
   display: flex;
   flex-direction: row;
   gap: 10px;
-  overflow-x: auto;
   overflow-y: hidden;
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -322,6 +340,8 @@ export default {
   flex-shrink: 0;
   width: 100px;
   cursor: pointer;
+  margin-right: 15px;
+  display: inline-block;
 }
 
 .thumbnail-image {
@@ -376,11 +396,12 @@ export default {
 
   .additional-images-list {
     overflow-y: hidden;
-    overflow-x: auto;
+    gap: 15px;
   }
 
   .thumbnail-container {
     width: 100px;
+    margin-right: 50px;
   }
 
   .thumbnail-image {
