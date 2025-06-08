@@ -228,10 +228,10 @@ export default {
       }
 
       try {
-        console.log("Sende Nachricht (via Store):", {
-          listingId,
-          content: messageData.content,
-        });
+        // console.log("Sende Nachricht (via Store):", {
+        //   listingId,
+        //   content: messageData.content,
+        // });
 
         await store.dispatch("messages/sendMessageToListing", {
           listingId: listingId,
