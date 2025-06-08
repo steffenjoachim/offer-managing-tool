@@ -50,7 +50,7 @@
 
         <el-form-item label="Images" prop="bilder">
           <el-upload
-            v-model:file-list="fileList"
+            :file-list="fileList"
             action="#"
             list-type="picture-card"
             :auto-upload="false"

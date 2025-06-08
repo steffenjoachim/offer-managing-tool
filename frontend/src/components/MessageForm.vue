@@ -24,8 +24,7 @@ export default {
     sendMessage() {
       if (this.messageContent.trim()) {
         this.$emit("message-sent", {
-          content: this.messageContent,
-          recipient: this.recipient,
+          content: this.messageContent.trim(),
         });
         this.messageContent = "";
       }

@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const state = {
-  token: localStorage.getItem("token") || null,
+  token: localStorage.getItem("access_token") || null,
   user: JSON.parse(localStorage.getItem("user")) || null,
 };
 
@@ -128,7 +128,7 @@ const mutations = {
     state.isAdmin = value;
   },
   setTokens(state, tokens) {
-    state.tokens = tokens;
+    state.token = tokens.access;
   },
 };
 
