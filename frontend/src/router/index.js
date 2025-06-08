@@ -37,6 +37,16 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/my-messages/:conversationId",
+    name: "MessageThread",
+    component: () =>
+      import(
+        /* webpackChunkName: "message-thread" */ "../views/MessageThread.vue"
+      ),
+    props: true,
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/listing/:id",
     name: "ListingDetail",
     component: () =>

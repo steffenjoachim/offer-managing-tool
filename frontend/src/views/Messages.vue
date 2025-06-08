@@ -39,7 +39,7 @@
             v-for="(conversation, index) in conversations"
             :key="conversation.id"
             class="conversation-item"
-            :class="{ unread: !conversation.isRead }"
+            :class="{ unread: conversation.unreadCount > 0 }"
             @click="openConversation(conversation.id)"
           >
             <div class="conversation-header">
@@ -58,7 +58,10 @@
               </div>
             </div>
             <div class="last-message-box">
-              <div class="last-message">
+              <div
+                class="last-message"
+                :class="{ 'is-unread': conversation.unreadCount > 0 }"
+              >
                 {{
                   conversation.last_message
                     ? conversation.last_message.text
@@ -66,6 +69,7 @@
                 }}
               </div>
               <span
+                v-if="conversation.unreadCount === 0"
                 class="delete-x"
                 @click.stop="confirmDelete(conversation.id)"
                 title="Delete conversation"
@@ -76,11 +80,6 @@
                 <span class="delete-x-inner">×</span>
               </span>
             </div>
-            <el-badge
-              v-if="conversation.unreadCount > 0"
-              :value="conversation.unreadCount"
-              class="unread-badge"
-            />
           </div>
         </el-scrollbar>
       </div>
@@ -239,6 +238,7 @@ export default {
       store.commit("messages/SET_LOADING", true);
       try {
         await store.dispatch("messages/fetchConversations");
+        // Debug-Logs entfernt
       } catch (error) {
         console.error("Fehler beim Laden der Konversationen:", error);
         store.commit(
@@ -250,111 +250,104 @@ export default {
       }
     };
 
-    const formatDate = (date) => {
-      if (!date) return "";
-
-      const timestamp = Date.parse(date);
-
-      if (isNaN(timestamp)) {
-        return "Invalid Date";
-      }
-
-      const options = {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      };
-      return new Date(timestamp).toLocaleDateString("de-DE", options);
-    };
-
-    const getOtherParticipantUsername = (conversation) => {
-      if (!currentUser.value || !conversation.participants) return "";
-      if (conversation.participants.length === 1) {
-        return conversation.participants[0].username;
-      }
-      const otherParticipant = conversation.participants.find(
-        (participant) => participant.id !== currentUser.value.id
-      );
-      return otherParticipant
-        ? otherParticipant.username
-        : "Unknown Participant";
-    };
-
     const openConversation = async (conversationId) => {
       try {
         await store.dispatch("messages/markAsRead", conversationId);
-        ElMessage.success("Message marked as read.");
-        console.log("Öffne Konversation:", conversationId);
-        setTimeout(() => {
-          fetchConversations();
-        }, 250);
+        router.push({
+          name: "MessageThread",
+          params: { conversationId: conversationId },
+        });
       } catch (error) {
-        console.error("Fehler beim Öffnen der Konversation:", error);
-        ElMessage.error("Failed to mark message as read.");
+        console.error(
+          "Fehler beim Öffnen der Konversation oder Markieren als gelesen:",
+          error
+        );
+        ElMessage.error("Failed to open conversation or mark as read.");
       }
     };
 
     const confirmDelete = (conversationId) => {
-      conversationToDelete.value = conversationId;
       deleteDialogVisible.value = true;
+      conversationToDelete.value = conversationId;
     };
+
     const handleDeleteDialogClose = () => {
       deleteDialogVisible.value = false;
       conversationToDelete.value = null;
     };
+
     const deleteConversation = async () => {
-      try {
-        await store.dispatch(
-          "messages/deleteConversation",
-          conversationToDelete.value
-        );
-        ElMessage.success("Conversation deleted.");
-      } catch (error) {
-        ElMessage.error("Failed to delete conversation.");
-      } finally {
-        handleDeleteDialogClose();
+      if (conversationToDelete.value) {
+        try {
+          await store.dispatch(
+            "messages/deleteConversation",
+            conversationToDelete.value
+          );
+          ElMessage.success("Konversation erfolgreich gelöscht.");
+          handleDeleteDialogClose();
+        } catch (error) {
+          console.error("Fehler beim Löschen der Konversation:", error);
+          ElMessage.error("Fehler beim Löschen der Konversation.");
+        }
       }
     };
 
+    // Initial fetch of conversations on component mount
     onMounted(() => {
-      console.log("onMounted: Initialization complete.");
-      // On mount, check if the user is already logged in and the user object is available
-      // If so, and conversations haven't been fetched yet, fetch them.
+      // Only fetch if user is logged in and not already fetched
       if (
         isLoggedIn.value &&
-        currentUser.value !== null &&
+        currentUser.value &&
         !hasFetchedConversations.value
       ) {
-        console.log(
-          "onMounted: User is logged in and user object available, fetching conversations."
-        );
         fetchConversations();
-        hasFetchedConversations.value = true; // Set flag after initiating fetch
-      } else {
-        console.log(
-          "onMounted: User not logged in or currentUser not available yet, or conversations already fetched."
-        );
+        hasFetchedConversations.value = true; // Set the flag after initial fetch
       }
     });
 
+    // Watch isLoggedIn and currentUser to trigger fetch on login
+    watch([isLoggedIn, currentUser], ([newIsLoggedIn, newUser]) => {
+      if (newIsLoggedIn && newUser && !hasFetchedConversations.value) {
+        fetchConversations();
+        hasFetchedConversations.value = true;
+      }
+    });
+
+    const navigateToCommunity = () => {
+      // Implement navigation to community if needed
+      console.log("Navigate to Community");
+    };
+
+    const formatDate = (dateString) => {
+      if (!dateString) return "";
+      const date = new Date(dateString);
+      return date.toLocaleDateString("de-DE", {
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    };
+
+    const conversationLastMessage = (conversation) => {
+      // Ensure conversation and last_message exist before accessing text
+      return conversation.last_message ? conversation.last_message.text : "";
+    };
+
     return {
+      conversations,
       loading,
       error,
-      conversations,
-      formatDate,
-      getOtherParticipantUsername,
+      currentDisplayState,
       openConversation,
-      isLoggedIn,
-      currentUser,
-      conversationDisplayTextsLocal,
-      deleteDialogVisible,
-      conversationToDelete,
       confirmDelete,
+      deleteDialogVisible,
       handleDeleteDialogClose,
       deleteConversation,
-      currentDisplayState,
+      navigateToCommunity,
+      formatDate,
+      conversationDisplayTextsLocal,
     };
   },
 };
@@ -362,151 +355,129 @@ export default {
 
 <style scoped>
 .messages-container {
-  max-width: 800px;
-  margin: 0 auto;
   padding: 20px;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
 .messages-card {
-  margin-bottom: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
 
 .card-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #333;
 }
 
-.loading-container {
-  padding: 20px;
+.card-header .el-icon {
+  margin-right: 10px;
+  font-size: 24px;
 }
 
-.error-container {
-  padding: 20px;
-}
-
+.loading-container,
+.error-container,
 .no-messages {
-  padding: 40px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
 }
 
 .conversations-list {
-  margin-top: 16px;
+  margin-top: 10px;
 }
 
 .conversation-item {
-  padding: 16px;
-  background: #f0f9ff;
-  margin-bottom: 8px;
-  border-radius: 6px;
-  border: 1px solid #e0e0e0;
+  padding: 15px;
+  border-bottom: 1px solid #eee;
   cursor: pointer;
+  transition: background-color 0.2s ease;
   position: relative;
-  transition: background-color 0.3s;
 }
 
 .conversation-item:hover {
-  background-color: #eaf6ff;
+  background-color: #f5f5f5;
 }
 
 .conversation-item.unread {
-  background-color: #e3f2fd;
-  font-weight: bold;
+  background-color: #e6f7ff; /* Light blue background for unread */
 }
 
 .conversation-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
 }
 
 .conversation-info-block {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  flex-grow: 1;
 }
 
 .listing-title {
-  color: #409eff;
-  font-weight: 500;
-  margin-bottom: 2px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 3px;
 }
 
 .sender-info {
-  color: #909399;
-  font-size: 0.95em;
-  font-weight: normal;
-  color: #909399;
+  font-size: 14px;
+  color: #666;
 }
 
 .header-right {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  min-width: 120px;
 }
 
 .timestamp {
-  color: #909399;
-  font-size: 0.9em;
-  margin-bottom: 2px;
+  font-size: 12px;
+  color: #999;
+  white-space: nowrap;
 }
 
 .last-message-box {
   display: flex;
-  align-items: flex-end;
-  position: relative;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .last-message {
-  color: #606266;
+  flex-grow: 1;
+  font-size: 14px;
+  color: #555;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1;
+}
+
+.last-message.is-unread {
+  font-weight: bold;
 }
 
 .delete-x {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border: 1px solid #bbb;
-  border-radius: 4px;
-  background: #fff;
+  margin-left: 10px;
+  color: #999;
+  font-size: 18px;
   cursor: pointer;
-  position: absolute;
-  right: 12px;
-  bottom: 6px;
-  transition: background 0.2s, color 0.2s;
-  box-sizing: border-box;
-  padding: 0;
-  outline: none;
-}
-.delete-x-inner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  font-size: 13px;
   line-height: 1;
-  color: #888;
-  user-select: none;
-}
-.delete-x:hover .delete-x-inner {
-  color: #d32f2f;
-}
-.delete-x:hover {
-  border-color: #d32f2f;
-  background: #fbe9e7;
+  padding: 2px 5px;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
 }
 
-.unread-badge {
-  position: absolute;
-  top: 16px;
-  right: 16px;
+.delete-x:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.delete-x-inner {
+  display: block;
 }
 </style>
