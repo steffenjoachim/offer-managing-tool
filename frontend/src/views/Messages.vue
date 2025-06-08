@@ -122,7 +122,10 @@ export default {
     const isLoggedIn = computed(() => store.getters["auth/isLoggedIn"]);
 
     const conversations = computed(() => {
-      return store.getters["messages/allConversations"];
+      return store.getters["messages/allConversations"].filter(
+        (conversation) =>
+          conversation.last_message && conversation.last_message.text
+      );
     });
 
     const currentUser = computed(() => {

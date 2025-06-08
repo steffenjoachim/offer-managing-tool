@@ -78,6 +78,25 @@ const actions = {
     }
   },
 
+  async sendMessageToListing({ commit, dispatch }, { listingId, content }) {
+    commit("SET_LOADING", true);
+    try {
+      const response = await axios.post(
+        "http://localhost:8000/api/messages/messages/send_message/",
+        {
+          listingId: listingId,
+          content: content,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw error;
+    } finally {
+      commit("SET_LOADING", false);
+      await dispatch("fetchConversations");
+    }
+  },
+
   async markAsRead({ commit }, conversationId) {
     try {
       await axios.post(
@@ -104,9 +123,11 @@ const actions = {
 const mutations = {
   SET_CONVERSATIONS(state, conversations) {
     state.conversations = conversations;
+    state.error = null;
   },
   SET_CURRENT_CONVERSATION(state, conversation) {
     state.currentConversation = conversation;
+    state.error = null;
   },
   SET_LOADING(state, loading) {
     state.loading = loading;

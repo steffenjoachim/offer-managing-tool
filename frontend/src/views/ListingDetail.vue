@@ -50,15 +50,17 @@
               </div>
             </div>
             <!-- Navigation Arrows -->
-            <div class="image-navigation" v-if="showScrollArrows">
+            <div class="image-navigation">
               <div
                 class="image-nav-arrow left"
+                v-if="showLeftArrow"
                 @click="scrollAdditionalImages('left')"
               >
                 ❮
               </div>
               <div
                 class="image-nav-arrow right"
+                v-if="showRightArrow"
                 @click="scrollAdditionalImages('right')"
               >
                 ❯
@@ -101,8 +103,9 @@
 import { ref, onMounted, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import axios from "axios";
-import { ElButton } from "element-plus";
+import { ElButton, ElMessage } from "element-plus";
 import MessageForm from "@/components/MessageForm.vue";
+import { useStore } from "vuex";
 
 export default {
   name: "ListingDetail",
@@ -115,8 +118,34 @@ export default {
     const route = useRoute();
     const listingId = route.params.id;
     const additionalImagesList = ref(null);
-    const showScrollArrows = ref(false); // State to control arrow visibility
+    const showLeftArrow = ref(false);
+    const showRightArrow = ref(false);
     const showMessageForm = ref(false);
+    const store = useStore();
+
+    const showError = (message) => {
+      try {
+        ElMessage({
+          message: message,
+          type: "error",
+          duration: 3000,
+        });
+      } catch (e) {
+        console.error("Error showing message:", e);
+      }
+    };
+
+    const showSuccess = (message) => {
+      try {
+        ElMessage({
+          message: message,
+          type: "success",
+          duration: 3000,
+        });
+      } catch (e) {
+        console.error("Error showing message:", e);
+      }
+    };
 
     const fetchListing = async () => {
       try {
@@ -135,15 +164,28 @@ export default {
 
     // Function to check if scroll arrows are needed
     const checkScrollArrowsNeeded = () => {
-      if (additionalImagesList.value) {
-        const list = additionalImagesList.value;
-        // Check if the content width is greater than the container width
-        if (list.scrollWidth > list.clientWidth) {
-          showScrollArrows.value = true;
-        } else {
-          showScrollArrows.value = false;
-        }
+      if (
+        !additionalImagesList.value ||
+        !listing.value ||
+        !listing.value.bilder ||
+        listing.value.bilder.length <= 1
+      ) {
+        showLeftArrow.value = false;
+        showRightArrow.value = false;
+        return;
       }
+
+      const list = additionalImagesList.value;
+      const scrollLeft = Math.round(list.scrollLeft);
+      const scrollWidth = Math.round(list.scrollWidth);
+      const clientWidth = Math.round(list.clientWidth);
+
+      // Linken Pfeil anzeigen, wenn scrollLeft größer als 0 ist.
+      showLeftArrow.value = scrollLeft > 0;
+
+      // Rechten Pfeil anzeigen, wenn scrollLeft kleiner ist als die maximale Scrollposition.
+      const maxScrollLeft = scrollWidth - clientWidth;
+      showRightArrow.value = scrollLeft < maxScrollLeft;
     };
 
     // Function to scroll the additional images list
@@ -167,6 +209,11 @@ export default {
         } else if (direction === "right") {
           list.scrollLeft += scrollAmount;
         }
+
+        // After scrolling, recheck arrow visibility
+        nextTick(() => {
+          checkScrollArrowsNeeded();
+        });
       }
     };
 
@@ -175,34 +222,52 @@ export default {
     };
 
     const handleMessageSent = async (messageData) => {
-      // console.log("Message Data:", {
-      //   sender: "current_user", // This will be replaced with actual user data
-      //   recipient: listing.value.user,
-      //   content: messageData.content,
-      //   timestamp: new Date().toISOString(),
-      //   listingId: listingId,
-      //   listingTitle: listing.value.titel,
-      // });
-
-      try {
-        const response = await axios.post(
-          "http://localhost:8000/api/messages/messages/send_message/",
-          {
-            listingId: listingId,
-            content: messageData.content,
-            // recipient wird im Backend basierend auf listingId ermittelt
-          }
-        );
-        console.log("Message sent successfully:", response.data);
-        // Optional: Erfolgsmeldung anzeigen
-        // ElMessage.success("Nachricht erfolgreich gesendet!"); // Benötigt ElMessage Import
-      } catch (error) {
-        console.error("Error sending message:", error);
-        // Optional: Fehlermeldung anzeigen
-        // ElMessage.error("Fehler beim Senden der Nachricht."); // Benötigt ElMessage Import
+      if (!listingId) {
+        showError("No listing ID available");
+        return;
       }
 
-      showMessageForm.value = false;
+      try {
+        console.log("Sende Nachricht (via Store):", {
+          listingId,
+          content: messageData.content,
+        });
+
+        await store.dispatch("messages/sendMessageToListing", {
+          listingId: listingId,
+          content: messageData.content,
+        });
+
+        showSuccess("Message sent successfully");
+        showMessageForm.value = false;
+      } catch (error) {
+        console.error(
+          "Fehler beim Senden der Nachricht:",
+          error.response?.data || error.message
+        );
+
+        let errorMessage = "An error occurred while sending the message";
+
+        try {
+          if (error.response?.data?.detail) {
+            if (
+              typeof error.response.data.detail === "string" &&
+              error.response.data.detail.includes(
+                "Sie können keine Nachricht an sich selbst senden"
+              )
+            ) {
+              errorMessage =
+                "You cannot send a message to yourself until another user initiates a conversation";
+            } else {
+              errorMessage = error.response.data.detail;
+            }
+          }
+        } catch (e) {
+          console.error("Error processing error message:", e);
+        }
+
+        showError(errorMessage);
+      }
     };
 
     onMounted(() => {
@@ -212,7 +277,8 @@ export default {
     return {
       listing,
       additionalImagesList,
-      showScrollArrows,
+      showLeftArrow,
+      showRightArrow,
       scrollAdditionalImages,
       showMessageForm,
       toggleMessageForm,
