@@ -3,8 +3,12 @@
     <el-card class="message-thread-card">
       <template #header>
         <div class="card-header">
-          <el-button @click="goBack" icon="el-icon-back" circle></el-button>
           <span>{{ listingTitle }}</span>
+          <el-button
+            class="close-thread-button"
+            @click="goBack"
+            icon="Close"
+          ></el-button>
         </div>
       </template>
 
@@ -58,12 +62,12 @@ import { ref, onMounted, computed, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { ElMessage } from "element-plus";
-import { ArrowLeft } from "@element-plus/icons-vue"; // Importiere den Icon
+import { Close } from "@element-plus/icons-vue"; // Importiere den Close Icon
 
 export default {
   name: "MessageThread",
   components: {
-    ArrowLeft, // Registriere den Icon als Komponente
+    Close, // Registriere den Icon als Komponente
   },
   props: {
     conversationId: {
@@ -108,9 +112,13 @@ export default {
       }
 
       try {
+        console.log(
+          "Debug (MessageThread.vue - sendMessage): Sende Inhalt:",
+          newMessageContent.value.trim()
+        );
         await store.dispatch("messages/sendMessage", {
           conversationId: props.conversationId,
-          message: newMessageContent.value.trim(),
+          content: newMessageContent.value.trim(),
         });
         newMessageContent.value = "";
         // Nach dem Senden erneut die Konversation laden, um die neue Nachricht anzuzeigen
@@ -172,14 +180,37 @@ export default {
 
 .card-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   font-size: 18px;
   font-weight: bold;
   color: #333;
 }
 
-.card-header .el-button {
-  margin-right: 10px;
+.card-header span {
+  flex-grow: 1; /* Lässt den Titel den verfügbaren Platz einnehmen */
+}
+
+.close-thread-button {
+  margin-left: 10px;
+  padding: 0;
+  height: 25px;
+  width: 25px;
+  min-width: unset;
+  border-radius: 50%;
+  color: #f56c6c; /* Rote Farbe */
+  border: 1px solid #f56c6c; /* Passender Rahmen */
+  background-color: transparent;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.close-thread-button:hover {
+  background-color: #fef0f0;
+  color: #f56c6c;
+}
+
+.close-thread-button .el-icon {
+  font-size: 14px;
 }
 
 .messages-list {
