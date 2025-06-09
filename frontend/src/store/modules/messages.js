@@ -56,44 +56,87 @@ const actions = {
     }
   },
 
-  async sendMessage({ commit }, { conversationId, message }) {
+  async sendMessage({ commit, rootGetters }, { conversationId, content }) {
+    console.log("Debug (messages.js - sendMessage): Starte sendMessage", {
+      conversationId,
+      content,
+    });
     commit("SET_LOADING", true);
     try {
+      const token = rootGetters["auth/accessToken"];
+      if (!token) {
+        console.error(
+          "Debug (messages.js - sendMessage): Access token nicht gefunden."
+        );
+        throw new Error("Authentifizierungstoken nicht gefunden.");
+      }
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
       const response = await axios.post(
         `http://127.0.0.1:8000/api/messages/conversations/${conversationId}/messages/`,
-        {
-          content: message,
-        }
+        { text: content } // Backend erwartet 'text' für den Nachrichteninhalt
       );
-      commit("ADD_MESSAGE", response.data);
+      console.log(
+        "Debug (messages.js - sendMessage): Nachricht erfolgreich gesendet.",
+        response.data
+      );
+      // Aktualisiere die Konversation mit der neuen Nachricht
+      commit("ADD_MESSAGE_TO_CONVERSATION", {
+        conversationId,
+        message: response.data,
+      });
       return response.data;
     } catch (error) {
+      console.error(
+        "Debug (messages.js - sendMessage): Fehler beim Senden der Nachricht:",
+        error.response?.data || error.message
+      );
       commit(
         "SET_ERROR",
-        error.response?.data?.detail || "Fehler beim Senden der Nachricht"
+        error.response?.data?.detail || "Fehler beim Senden der Nachricht."
       );
       throw error;
     } finally {
       commit("SET_LOADING", false);
+      console.log(
+        "Debug (messages.js - sendMessage): sendMessage abgeschlossen."
+      );
     }
   },
 
   async sendMessageToListing({ commit, dispatch }, { listingId, content }) {
     commit("SET_LOADING", true);
     try {
-      const response = await axios.post(
-        "http://localhost:8000/api/messages/messages/send_message/",
+      // Zuerst eine neue Konversation erstellen
+      const conversationResponse = await axios.post(
+        "http://localhost:8000/api/messages/conversations/",
         {
-          listingId: listingId,
-          content: content,
+          listing: listingId,
+          participants: [], // Das Backend wird den aktuellen Benutzer automatisch hinzufügen
         }
       );
+
+      const conversationId = conversationResponse.data.id;
+
+      // Dann die Nachricht in der neuen Konversation senden
+      const response = await axios.post(
+        `http://localhost:8000/api/messages/conversations/${conversationId}/messages/`,
+        {
+          text: content,
+        }
+      );
+
+      // Aktualisiere die Konversationsliste
+      await dispatch("fetchConversations");
       return response.data;
     } catch (error) {
+      console.error(
+        "Fehler beim Senden der Nachricht:",
+        error.response?.data || error
+      );
       throw error;
     } finally {
       commit("SET_LOADING", false);
-      await dispatch("fetchConversations");
     }
   },
 
@@ -135,9 +178,24 @@ const mutations = {
   SET_ERROR(state, error) {
     state.error = error;
   },
-  ADD_MESSAGE(state, message) {
-    if (state.currentConversation) {
-      state.currentConversation.messages.push(message);
+  ADD_MESSAGE_TO_CONVERSATION(state, { conversationId, message }) {
+    console.log(
+      "Debug (messages.js - ADD_MESSAGE_TO_CONVERSATION): Nachricht hinzufügen zu Konversation",
+      conversationId,
+      message
+    );
+    const conversation = state.conversations.find(
+      (conv) => conv.id === conversationId
+    );
+    if (conversation) {
+      conversation.messages.push(message);
+      conversation.last_message = message;
+      // Sortiere Konversationen, damit die zuletzt aktualisierte oben steht
+      state.conversations.sort(
+        (a, b) =>
+          new Date(b.last_message.timestamp) -
+          new Date(a.last_message.timestamp)
+      );
     }
   },
   MARK_CONVERSATION_AS_READ(state, conversationId) {
