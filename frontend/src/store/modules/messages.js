@@ -56,10 +56,10 @@ const actions = {
     }
   },
 
-  async sendMessage({ commit, rootGetters }, { conversationId, content }) {
+  async sendMessage({ commit, rootGetters }, { conversationId, messageData }) {
     console.log("Debug (messages.js - sendMessage): Starte sendMessage", {
       conversationId,
-      content,
+      messageData,
     });
     commit("SET_LOADING", true);
     try {
@@ -74,13 +74,12 @@ const actions = {
 
       const response = await axios.post(
         `http://127.0.0.1:8000/api/messages/conversations/${conversationId}/messages/`,
-        { text: content } // Backend erwartet 'text' für den Nachrichteninhalt
+        messageData
       );
       console.log(
         "Debug (messages.js - sendMessage): Nachricht erfolgreich gesendet.",
         response.data
       );
-      // Aktualisiere die Konversation mit der neuen Nachricht
       commit("ADD_MESSAGE_TO_CONVERSATION", {
         conversationId,
         message: response.data,
@@ -104,34 +103,31 @@ const actions = {
     }
   },
 
-  async sendMessageToListing({ commit, dispatch }, { listingId, content }) {
+  async sendMessageToListing(
+    { commit, dispatch, rootGetters },
+    { listingId, content }
+  ) {
     commit("SET_LOADING", true);
     try {
-      // Zuerst eine neue Konversation erstellen
-      const conversationResponse = await axios.post(
-        "http://localhost:8000/api/messages/conversations/",
-        {
-          listing: listingId,
-          participants: [], // Das Backend wird den aktuellen Benutzer automatisch hinzufügen
-        }
-      );
+      const token = rootGetters["auth/accessToken"];
+      if (!token) {
+        throw new Error("Authentifizierungstoken nicht gefunden.");
+      }
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-      const conversationId = conversationResponse.data.id;
-
-      // Dann die Nachricht in der neuen Konversation senden
       const response = await axios.post(
-        `http://localhost:8000/api/messages/conversations/${conversationId}/messages/`,
+        "http://localhost:8000/api/messages/messages/send_message_to_listing/",
         {
-          text: content,
+          listingId: listingId,
+          content: content,
         }
       );
 
-      // Aktualisiere die Konversationsliste
       await dispatch("fetchConversations");
       return response.data;
     } catch (error) {
       console.error(
-        "Fehler beim Senden der Nachricht:",
+        "Fehler beim Senden der Nachricht an Listing:",
         error.response?.data || error
       );
       throw error;

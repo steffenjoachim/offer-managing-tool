@@ -37,7 +37,24 @@
         >
           <div class="message-content">
             <p class="message-sender">{{ message.sender.username }}</p>
-            <p class="message-text">{{ message.text }}</p>
+            <p class="message-text" v-if="message.text">{{ message.text }}</p>
+            <div v-if="message.file" class="message-file">
+              <img
+                v-if="isImage(message.file)"
+                :src="message.file"
+                alt="Attached Image"
+                class="attached-image"
+                @click="showImage(message.file)"
+              />
+              <a
+                v-else
+                :href="message.file"
+                target="_blank"
+                class="attached-file-link"
+              >
+                <el-icon><Document /></el-icon> {{ getFileName(message.file) }}
+              </a>
+            </div>
             <span class="message-timestamp">{{
               new Date(message.timestamp).toLocaleString()
             }}</span>
@@ -51,9 +68,31 @@
           placeholder="Ihre Nachricht..."
           @keyup.enter="sendMessage"
         ></el-input>
+        <div class="file-input-wrapper">
+          <label for="file-upload" class="file-input-label"
+            >Datei auswählen</label
+          >
+          <input
+            type="file"
+            id="file-upload"
+            @change="handleFileChange"
+            accept="image/*,application/pdf"
+            ref="fileInput"
+            class="file-input"
+          />
+          <span v-if="selectedFile" class="file-name">{{
+            selectedFile.name
+          }}</span>
+        </div>
         <el-button type="primary" @click="sendMessage">Senden</el-button>
       </div>
     </el-card>
+
+    <el-image-viewer
+      v-if="showImageViewer"
+      :url-list="[currentImage]"
+      @close="closeImageViewer"
+    />
   </div>
 </template>
 
@@ -61,13 +100,15 @@
 import { ref, onMounted, computed, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { ElMessage } from "element-plus";
-import { Close } from "@element-plus/icons-vue"; // Importiere den Close Icon
+import { ElMessage, ElImageViewer } from "element-plus";
+import { Close, Document } from "@element-plus/icons-vue";
 
 export default {
   name: "MessageThread",
   components: {
-    Close, // Registriere den Icon als Komponente
+    Close,
+    Document,
+    ElImageViewer,
   },
   props: {
     conversationId: {
@@ -90,6 +131,11 @@ export default {
     const loading = computed(() => store.getters["messages/isLoading"]);
     const error = computed(() => store.getters["messages/errorMessage"]);
     const newMessageContent = ref("");
+    const selectedFile = ref(null);
+    const fileInput = ref(null);
+
+    const showImageViewer = ref(false);
+    const currentImage = ref("");
 
     const currentUserId = computed(() => store.getters["auth/currentUser"]?.id);
 
@@ -105,23 +151,38 @@ export default {
       }
     };
 
+    const handleFileChange = (event) => {
+      selectedFile.value = event.target.files[0];
+    };
+
     const sendMessage = async () => {
-      if (!newMessageContent.value.trim()) {
-        ElMessage.warning("Nachricht kann nicht leer sein.");
+      if (!newMessageContent.value.trim() && !selectedFile.value) {
+        ElMessage.warning(
+          "Nachricht kann nicht leer sein und keine Datei wurde ausgewählt."
+        );
         return;
       }
 
+      const messageData = new FormData();
+      if (newMessageContent.value.trim()) {
+        messageData.append("text", newMessageContent.value.trim());
+      }
+      if (selectedFile.value) {
+        messageData.append("file", selectedFile.value);
+      }
+
       try {
-        console.log(
-          "Debug (MessageThread.vue - sendMessage): Sende Inhalt:",
-          newMessageContent.value.trim()
-        );
         await store.dispatch("messages/sendMessage", {
           conversationId: props.conversationId,
-          content: newMessageContent.value.trim(),
+          messageData: messageData,
         });
+
         newMessageContent.value = "";
-        // Nach dem Senden erneut die Konversation laden, um die neue Nachricht anzuzeigen
+        selectedFile.value = null;
+        if (fileInput.value) {
+          fileInput.value.value = "";
+        }
+
         await fetchCurrentConversation();
       } catch (err) {
         ElMessage.error("Fehler beim Senden der Nachricht.");
@@ -133,11 +194,46 @@ export default {
       router.push({ name: "Messages" });
     };
 
+    const showImage = (imageUrl) => {
+      currentImage.value = imageUrl;
+      showImageViewer.value = true;
+    };
+
+    const closeImageViewer = () => {
+      showImageViewer.value = false;
+      currentImage.value = "";
+    };
+
+    const isImage = (fileName) => {
+      if (!fileName) return false;
+      const imageExtensions = [
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".bmp",
+        ".webp",
+        ".svg",
+      ];
+      const lowerCaseFileName = fileName.toLowerCase();
+      return imageExtensions.some((ext) => lowerCaseFileName.endsWith(ext));
+    };
+
+    const getFileName = (fileUrl) => {
+      if (!fileUrl) return "Datei";
+      try {
+        const url = new URL(fileUrl);
+        const pathSegments = url.pathname.split("/");
+        return pathSegments[pathSegments.length - 1];
+      } catch (e) {
+        return fileUrl.split("/").pop();
+      }
+    };
+
     onMounted(() => {
       fetchCurrentConversation();
     });
 
-    // Optional: Beobachten, ob sich die Nachrichtenliste ändert, um zum Ende zu scrollen
     watch(
       messages,
       () => {
@@ -156,10 +252,19 @@ export default {
       loading,
       error,
       newMessageContent,
+      selectedFile,
+      fileInput,
+      showImageViewer,
+      currentImage,
       currentUserId,
       sendMessage,
+      handleFileChange,
       goBack,
       listingTitle,
+      isImage,
+      getFileName,
+      showImage,
+      closeImageViewer,
     };
   },
 };
@@ -170,10 +275,13 @@ export default {
   padding: 20px;
   max-width: 800px;
   margin: 0 auto;
+  min-height: calc(100vh - 100px);
+  display: flex;
+  flex-direction: column;
 }
 
 .message-thread-card {
-  height: calc(100vh - 120px); /* Adjust based on header/footer */
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
 }
@@ -188,7 +296,7 @@ export default {
 }
 
 .card-header span {
-  flex-grow: 1; /* Lässt den Titel den verfügbaren Platz einnehmen */
+  flex-grow: 1;
 }
 
 .close-thread-button {
@@ -198,8 +306,8 @@ export default {
   width: 25px;
   min-width: unset;
   border-radius: 50%;
-  color: #f56c6c; /* Rote Farbe */
-  border: 1px solid #f56c6c; /* Passender Rahmen */
+  color: #f56c6c;
+  border: 1px solid #f56c6c;
   background-color: transparent;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
@@ -219,7 +327,6 @@ export default {
   padding: 15px;
   background-color: #f9f9f9;
   border-radius: 4px;
-  margin-bottom: 10px;
 }
 
 .message-item {
@@ -245,12 +352,12 @@ export default {
 }
 
 .message-item.sent .message-content {
-  background-color: #e0f2fe; /* Light blue for sent messages */
+  background-color: #e0f2fe;
   color: #333;
 }
 
 .message-item.received .message-content {
-  background-color: #f0f0f0; /* Light gray for received messages */
+  background-color: #f0f0f0;
   color: #333;
 }
 
@@ -268,6 +375,7 @@ export default {
 .message-text {
   margin: 0;
   font-size: 15px;
+  word-break: break-word;
 }
 
 .message-timestamp {
@@ -278,15 +386,83 @@ export default {
   text-align: right;
 }
 
-.message-input-area {
-  display: flex;
-  padding: 10px 15px;
-  border-top: 1px solid #eee;
+.message-file {
+  margin-top: 5px;
 }
 
-.message-input-area .el-input {
+.attached-image {
+  max-width: 200px;
+  max-height: 150px;
+  width: auto;
+  height: auto;
+  border-radius: 4px;
+  margin-top: 5px;
+  cursor: pointer;
+  object-fit: contain;
+}
+
+.attached-file-link {
+  display: inline-flex;
+  align-items: center;
+  color: #409eff;
+  text-decoration: none;
+  margin-top: 5px;
+}
+
+.attached-file-link:hover {
+  text-decoration: underline;
+}
+
+.attached-file-link .el-icon {
+  margin-right: 5px;
+}
+
+.message-input-area {
+  display: flex;
+  padding: 10px;
+  gap: 10px;
+  border-top: 1px solid #eee;
+  align-items: center;
+}
+
+.el-input {
   flex-grow: 1;
-  margin-right: 10px;
+}
+
+.file-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.file-input {
+  display: none;
+}
+
+.file-input-label {
+  background-color: #409eff;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.file-input-label:hover {
+  background-color: #337ecc;
+}
+
+.file-name {
+  font-size: 14px;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-grow: 1;
+  max-width: 150px;
 }
 
 .loading-container,
