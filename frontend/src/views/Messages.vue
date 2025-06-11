@@ -64,7 +64,10 @@
               >
                 {{
                   conversation.last_message
-                    ? conversation.last_message.text
+                    ? conversation.last_message.text ||
+                      (conversation.last_message.file
+                        ? "[Datei angehängt]"
+                        : "")
                     : ""
                 }}
               </div>
@@ -119,11 +122,13 @@ export default {
     const error = computed(() => store.getters["messages/errorMessage"]);
 
     const isLoggedIn = computed(() => store.getters["auth/isLoggedIn"]);
+    const isAuthReady = computed(() => store.getters["auth/isAuthReady"]);
 
     const conversations = computed(() => {
-      return store.getters["messages/allConversations"].filter(
-        (conversation) =>
-          conversation.last_message && conversation.last_message.text
+      // Ensure conversations is always an array
+      const allConversations = store.getters["messages/allConversations"] || [];
+      return allConversations.filter(
+        (conversation) => conversation.last_message
       );
     });
 
@@ -181,173 +186,105 @@ export default {
       conversationDisplayTextsLocal.value = newDisplayTexts;
     });
 
-    // Flag to prevent fetching conversations multiple times
-    const hasFetchedConversations = ref(false); // Resetting to a simpler flag
-
-    // Watch for changes in isLoggedIn and currentUser, mainly to handle logout
-    watch([isLoggedIn, currentUser], ([newIsLoggedIn, newUser]) => {
-      if (!newIsLoggedIn || !newUser) {
-        // If user logs out or currentUser becomes null/undefined, reset state
-        hasFetchedConversations.value = false;
-        // Optionally clear conversations from store here if needed on logout
-        // store.commit("messages/SET_CONVERSATIONS", []);
-      }
-      // Initial fetching is handled in onMounted now
-    });
+    // Watch for authentication status and user data to trigger conversation fetch
+    watch(
+      [isAuthReady, currentUser],
+      ([newIsAuthReady, newCurrentUser]) => {
+        if (newIsAuthReady && newCurrentUser && newCurrentUser.id) {
+          console.log(
+            "MessagesView: Auth ready and user logged in, fetching conversations."
+          );
+          store.dispatch("messages/fetchConversations");
+        } else if (newIsAuthReady && !newCurrentUser) {
+          console.log(
+            "MessagesView: Auth ready but user NOT logged in, clearing conversations."
+          );
+          // Auth is ready but no user is logged in, clear conversations
+          store.commit("messages/SET_CONVERSATIONS", []);
+        } else {
+          console.log("MessagesView: Auth NOT ready yet.");
+          // Auth is not ready yet, keep current state (e.g., loading spinner)
+        }
+      },
+      { immediate: true } // Run immediately on component mount
+    );
 
     const currentDisplayState = computed(() => {
       // 1. Priority: Loading State
-      // Show loading if the message store is loading OR if user is logged in but currentUser object is not yet available
-      // We also show loading if the user is logged in but conversations haven't been fetched yet
-      if (
-        loading.value ||
-        (isLoggedIn.value && currentUser.value === null) ||
-        (isLoggedIn.value && !hasFetchedConversations.value)
-      ) {
+      // Show loading if the message store is loading OR if auth is not ready yet
+      if (loading.value || !isAuthReady.value) {
         return "loading";
       }
-
       // 2. Priority: Error State
       if (error.value) {
         return "error";
       }
-
-      // 3. Priority: User not logged in (should be handled by router guard, but as a fallback)
-      if (!isLoggedIn.value) {
-        return "loading"; // Or potentially a different state if app allows visiting this page when logged out
-      }
-
-      // 4. Priority: Messages available
-      if (conversations.value?.length > 0) {
-        return "list";
-      }
-
-      // 5. Last Priority: No messages
-      if (conversations.value?.length === 0) {
+      // 3. Priority: No Messages State
+      if (conversations.value.length === 0) {
         return "no-messages";
       }
-
-      // Fallback for unexpected states
-      return "loading";
+      // 4. Default: List State
+      return "list";
     });
 
     const deleteDialogVisible = ref(false);
-    const conversationToDelete = ref(null);
-
-    const fetchConversations = async () => {
-      store.commit("messages/SET_LOADING", true);
-      try {
-        await store.dispatch("messages/fetchConversations");
-        // Debug-Logs entfernt
-      } catch (error) {
-        console.error("Fehler beim Laden der Konversationen:", error);
-        store.commit(
-          "messages/SET_ERROR",
-          error.message || "Fehler beim Laden der Konversationen."
-        );
-      } finally {
-        store.commit("messages/SET_LOADING", false);
-      }
-    };
-
-    const openConversation = async (conversationId) => {
-      try {
-        await store.dispatch("messages/markAsRead", conversationId);
-        router.push({
-          name: "MessageThread",
-          params: { conversationId: conversationId },
-        });
-      } catch (error) {
-        console.error(
-          "Fehler beim Öffnen der Konversation oder Markieren als gelesen:",
-          error
-        );
-        ElMessage.error("Failed to open conversation or mark as read.");
-      }
-    };
+    const conversationToDeleteId = ref(null);
 
     const confirmDelete = (conversationId) => {
+      conversationToDeleteId.value = conversationId;
       deleteDialogVisible.value = true;
-      conversationToDelete.value = conversationId;
     };
 
     const handleDeleteDialogClose = () => {
       deleteDialogVisible.value = false;
-      conversationToDelete.value = null;
+      conversationToDeleteId.value = null;
     };
 
     const deleteConversation = async () => {
-      if (conversationToDelete.value) {
+      if (conversationToDeleteId.value) {
         try {
           await store.dispatch(
             "messages/deleteConversation",
-            conversationToDelete.value
+            conversationToDeleteId.value
           );
-          ElMessage.success("Konversation erfolgreich gelöscht.");
+          ElMessage.success("Conversation deleted successfully!");
           handleDeleteDialogClose();
-        } catch (error) {
-          console.error("Fehler beim Löschen der Konversation:", error);
-          ElMessage.error("Fehler beim Löschen der Konversation.");
+        } catch (err) {
+          ElMessage.error("Failed to delete conversation.");
+          console.error("Error deleting conversation:", err);
         }
       }
     };
 
-    // Initial fetch of conversations on component mount
-    onMounted(() => {
-      // Only fetch if user is logged in and not already fetched
-      if (
-        isLoggedIn.value &&
-        currentUser.value &&
-        !hasFetchedConversations.value
-      ) {
-        fetchConversations();
-        hasFetchedConversations.value = true; // Set the flag after initial fetch
-      }
-    });
-
-    // Watch isLoggedIn and currentUser to trigger fetch on login
-    watch([isLoggedIn, currentUser], ([newIsLoggedIn, newUser]) => {
-      if (newIsLoggedIn && newUser && !hasFetchedConversations.value) {
-        fetchConversations();
-        hasFetchedConversations.value = true;
-      }
-    });
-
-    const navigateToCommunity = () => {
-      // Implement navigation to community if needed
-      console.log("Navigate to Community");
+    const openConversation = (conversationId) => {
+      router.push(`/my-messages/${conversationId}`);
     };
 
+    // Format date for display
     const formatDate = (dateString) => {
       if (!dateString) return "";
       const date = new Date(dateString);
-      return date.toLocaleDateString("de-DE", {
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      return date.toLocaleDateString() + " " + date.toLocaleTimeString();
     };
 
-    const conversationLastMessage = (conversation) => {
-      // Ensure conversation and last_message exist before accessing text
-      return conversation.last_message ? conversation.last_message.text : "";
+    const navigateToCommunity = () => {
+      router.push("/"); // Adjust as per your community route
     };
 
     return {
-      conversations,
+      currentDisplayState,
       loading,
       error,
-      currentDisplayState,
+      conversations,
       openConversation,
-      confirmDelete,
       deleteDialogVisible,
+      confirmDelete,
       handleDeleteDialogClose,
       deleteConversation,
-      navigateToCommunity,
       formatDate,
+      navigateToCommunity,
       conversationDisplayTextsLocal,
+      currentUser,
     };
   },
 };

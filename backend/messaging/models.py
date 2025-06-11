@@ -43,7 +43,8 @@ class Message(models.Model):
         null=True,
         blank=True
     )
-    text = models.TextField(verbose_name='Nachrichtentext')
+    text = models.TextField(verbose_name='Nachrichtentext', blank=True, null=True)
+    file = models.FileField(upload_to='message_files/', blank=True, null=True)
     timestamp = models.DateTimeField(default=timezone.now)
     is_read = models.BooleanField(default=False, verbose_name='Gelesen')
 

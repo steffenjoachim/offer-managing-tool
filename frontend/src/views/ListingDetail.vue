@@ -84,7 +84,7 @@
           <el-button type="primary" @click="toggleMessageForm"
             >Send Message</el-button
           >
-          <el-button>Add to Watchlist</el-button>
+          <el-button @click="addToWatchlist">Add to Watchlist</el-button>
         </div>
         <MessageForm
           v-if="showMessageForm"
@@ -265,6 +265,23 @@ export default {
       }
     };
 
+    const addToWatchlist = async () => {
+      if (!listing.value || !listing.value.id) {
+        showError("Listing information not available.");
+        return;
+      }
+      try {
+        await store.dispatch(
+          "watchlist/addListingToWatchlist",
+          listing.value.id
+        );
+        showSuccess("Listing added to watchlist!");
+      } catch (error) {
+        console.error("Error adding to watchlist:", error);
+        showError(error.message || "Failed to add listing to watchlist.");
+      }
+    };
+
     onMounted(() => {
       fetchListing();
     });
@@ -278,6 +295,7 @@ export default {
       showMessageForm,
       toggleMessageForm,
       handleMessageSent,
+      addToWatchlist,
     };
   },
 };

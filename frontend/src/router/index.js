@@ -47,6 +47,20 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/my-watchlist",
+    name: "Watchlist",
+    component: () =>
+      import(/* webpackChunkName: "watchlist" */ "../views/Watchlist.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/my-listings",
+    name: "MyListings",
+    component: () =>
+      import(/* webpackChunkName: "my-listings" */ "../views/MyListings.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/listing/:id",
     name: "ListingDetail",
     component: () =>

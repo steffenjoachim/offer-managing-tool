@@ -4,8 +4,12 @@ from . import views
 
 router = DefaultRouter()
 router.register(r'conversations', views.ConversationViewSet, basename='conversation')
-router.register(r'messages', views.MessageViewSet, basename='message')
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('conversations/<int:conversation_pk>/messages/', views.MessageViewSet.as_view({
+        'post': 'create',
+        'get': 'list'
+    }), name='conversation-messages'),
+    path('messages/send_message_to_listing/', views.MessageViewSet.as_view({'post': 'send_message'}), name='send-message-to-listing'),
 ] 

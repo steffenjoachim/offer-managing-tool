@@ -12,6 +12,13 @@ class ListingListCreateView(generics.ListCreateAPIView):
     serializer_class = AnzeigeSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user_id = self.request.query_params.get('user_id')
+        if user_id:
+            queryset = queryset.filter(user__id=user_id)
+        return queryset
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 

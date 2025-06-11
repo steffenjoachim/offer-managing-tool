@@ -19,14 +19,23 @@ const getters = {
 
 const actions = {
   async fetchConversations({ commit }) {
+    console.log("Messages Store: fetchConversations action started.");
     commit("SET_LOADING", true);
     try {
       const response = await axios.get(
         "http://127.0.0.1:8000/api/messages/conversations/"
       );
+      console.log(
+        "Messages Store: fetchConversations successful, response data:",
+        response.data
+      );
       commit("SET_CONVERSATIONS", response.data);
       return response.data;
     } catch (error) {
+      console.error(
+        "Messages Store: Error fetching conversations:",
+        error.response?.data || error.message
+      );
       commit(
         "SET_ERROR",
         error.response?.data?.detail || "Fehler beim Laden der Konversationen"
@@ -34,6 +43,7 @@ const actions = {
       throw error;
     } finally {
       commit("SET_LOADING", false);
+      console.log("Messages Store: fetchConversations action finished.");
     }
   },
 
@@ -120,6 +130,11 @@ const actions = {
         {
           listingId: listingId,
           content: content,
+        },
+        {
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
         }
       );
 

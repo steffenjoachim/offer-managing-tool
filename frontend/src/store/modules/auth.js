@@ -3,6 +3,7 @@ import axios from "axios";
 const state = {
   token: localStorage.getItem("access_token") || null,
   user: JSON.parse(localStorage.getItem("user")) || null,
+  authReady: false,
 };
 
 const getters = {
@@ -11,6 +12,7 @@ const getters = {
   isAdmin: (state) => state.user?.isAdmin || false,
   accessToken: (state) => state.token,
   currentUser: (state) => state.user,
+  isAuthReady: (state) => state.authReady,
 };
 
 const actions = {
@@ -77,34 +79,40 @@ const actions = {
     const accessToken = localStorage.getItem("access_token");
     const refreshToken = localStorage.getItem("refresh_token");
 
-    if (accessToken && refreshToken) {
-      console.log("Auth Store: Tokens found in localStorage.");
-      axios.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
+    try {
+      if (accessToken && refreshToken) {
+        console.log("Auth Store: Tokens found in localStorage.");
+        axios.defaults.headers.common[
+          "Authorization"
+        ] = `Bearer ${accessToken}`;
 
-      try {
-        const response = await axios.get(
-          "http://localhost:8000/api/auth/user/"
-        );
-        const user = response.data;
-        console.log("Auth Store: User data fetched from backend:", user);
-        commit("setUser", user);
-        commit("setAdmin", user.is_admin || false);
-        commit("setTokens", { access: accessToken, refresh: refreshToken });
+        try {
+          const response = await axios.get(
+            "http://localhost:8000/api/auth/user/"
+          );
+          const user = response.data;
+          console.log("Auth Store: User data fetched from backend:", user);
+          commit("setUser", user);
+          commit("setAdmin", user.is_admin || false);
+          commit("setTokens", { access: accessToken, refresh: refreshToken });
+          console.log(
+            "Auth Store: User and tokens set in store after checkAuth."
+          );
+        } catch (error) {
+          console.error(
+            "Auth Store: Error fetching user data during checkAuth:",
+            error
+          );
+          dispatch("logout");
+        }
+      } else {
         console.log(
-          "Auth Store: User and tokens set in store after checkAuth."
+          "Auth Store: No tokens found in localStorage. User not logged in."
         );
-      } catch (error) {
-        console.error(
-          "Auth Store: Error fetching user data during checkAuth:",
-          error
-        );
-        dispatch("logout");
+        commit("CLEAR_AUTH");
       }
-    } else {
-      console.log(
-        "Auth Store: No tokens found in localStorage. User not logged in."
-      );
-      commit("CLEAR_AUTH");
+    } finally {
+      commit("SET_AUTH_READY");
     }
   },
 };
@@ -129,6 +137,9 @@ const mutations = {
   },
   setTokens(state, tokens) {
     state.token = tokens.access;
+  },
+  SET_AUTH_READY(state) {
+    state.authReady = true;
   },
 };
 

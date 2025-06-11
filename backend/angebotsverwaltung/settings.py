@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'users',
     'kleinanzeigen',
     'messaging.apps.MessagingConfig', # Neue messaging App
+    'watchlist.apps.WatchlistConfig',
 ]
 
 MIDDLEWARE = [

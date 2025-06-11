@@ -3,12 +3,14 @@ import axios from "axios";
 import auth from "./modules/auth";
 import listings from "./modules/listings";
 import messages from "./modules/messages";
+import watchlist from "./modules/watchlist";
 
 export default createStore({
   modules: {
     auth,
     listings,
     messages,
+    watchlist,
   },
   state: {
     isAdmin: false,
