@@ -27,6 +27,9 @@
                 <el-dropdown-item command="myListings"
                   >My Listings</el-dropdown-item
                 >
+                <el-dropdown-item command="myWatchlist"
+                  >My Watchlist</el-dropdown-item
+                >
                 <el-dropdown-item command="logout">Logout</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -70,6 +73,8 @@ export default {
         router.push("/my-listings");
       } else if (command === "myMessages") {
         router.push("/my-messages");
+      } else if (command === "myWatchlist") {
+        router.push("/my-watchlist");
       }
     };
 

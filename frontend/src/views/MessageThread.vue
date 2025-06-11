@@ -21,9 +21,7 @@
       </div>
 
       <div v-else-if="messages.length === 0" class="no-messages">
-        <el-empty
-          description="Keine Nachrichten in dieser Konversation."
-        ></el-empty>
+        <el-empty description="No Messages yet in this Conversation"></el-empty>
       </div>
 
       <div v-else class="messages-list">
@@ -65,13 +63,10 @@
       <div class="message-input-area">
         <el-input
           v-model="newMessageContent"
-          placeholder="Ihre Nachricht..."
-          @keyup.enter="sendMessage"
+          placeholder="Enter Message..."
         ></el-input>
         <div class="file-input-wrapper">
-          <label for="file-upload" class="file-input-label"
-            >Datei auswählen</label
-          >
+          <label for="file-upload" class="file-input-label">Select File</label>
           <input
             type="file"
             id="file-upload"
@@ -84,7 +79,7 @@
             selectedFile.name
           }}</span>
         </div>
-        <el-button type="primary" @click="sendMessage">Senden</el-button>
+        <el-button type="primary" @click="sendMessage">Send</el-button>
       </div>
     </el-card>
 
@@ -101,7 +96,7 @@ import { ref, onMounted, computed, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { ElMessage, ElImageViewer } from "element-plus";
-import { Close, Document } from "@element-plus/icons-vue";
+import { Close, Document, Message } from "@element-plus/icons-vue";
 
 export default {
   name: "MessageThread",
@@ -109,6 +104,7 @@ export default {
     Close,
     Document,
     ElImageViewer,
+    Message,
   },
   props: {
     conversationId: {
@@ -145,6 +141,9 @@ export default {
           "messages/fetchConversation",
           props.conversationId
         );
+        await store.dispatch("messages/markAsRead", props.conversationId);
+        // scrollToBottom(); // Scroll to bottom after fetching
+        error.value = null;
       } catch (err) {
         ElMessage.error("Fehler beim Laden der Konversation.");
         console.error("Error fetching conversation:", err);
@@ -230,10 +229,12 @@ export default {
       }
     };
 
+    // Initial fetch and scroll
     onMounted(() => {
       fetchCurrentConversation();
     });
 
+    // Scroll to bottom when messages change
     watch(
       messages,
       () => {
@@ -319,6 +320,15 @@ export default {
 
 .close-thread-button .el-icon {
   font-size: 14px;
+}
+
+.loading-container,
+.error-container,
+.no-messages {
+  flex-grow: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .messages-list {
@@ -463,14 +473,5 @@ export default {
   text-overflow: ellipsis;
   flex-grow: 1;
   max-width: 150px;
-}
-
-.loading-container,
-.error-container,
-.no-messages {
-  flex-grow: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 </style>

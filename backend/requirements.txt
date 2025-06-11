@@ -5,4 +5,5 @@ django-cors-headers==4.3.1
 django-filter==23.5
 Pillow==10.2.0
 python-dotenv==1.0.1
-reportlab==4.1.0 
+reportlab==4.1.0
+djangorestframework-nested-routers 
