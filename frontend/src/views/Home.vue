@@ -18,19 +18,22 @@
         >
           <img
             :src="
-              Array.isArray(listing.bilder) && listing.bilder.length > 0
-                ? listing.bilder[0].bild
-                : typeof listing.bilder === 'string'
-                ? listing.bilder
+              Array.isArray(listing.images) && listing.images.length > 0
+                ? listing.images[0].bild
+                : typeof listing.images === 'string'
+                ? listing.images
                 : '/images/placeholder-image.svg'
             "
             class="listing-image"
             @error="handleImageError"
-            alt="Anzeigenbild"
+            alt="Listing Image"
           />
           <div class="listing-info">
-            <h3 class="listing-title">{{ listing.titel }}</h3>
-            <p class="listing-price">€{{ listing.preis }}</p>
+            <h3 class="listing-title">{{ listing.title }}</h3>
+            <p class="listing-price">€{{ listing.price }}</p>
+            <p class="listing-date">
+              Created at: {{ formatDate(listing.createdAt) }}
+            </p>
           </div>
         </el-card>
       </el-col>
@@ -52,14 +55,21 @@ export default {
     const router = useRouter();
 
     const handleImageError = (e) => {
-      console.error("Bild konnte nicht geladen werden:", e);
+      console.error("Image could not be loaded:", e);
       e.target.src = "/images/placeholder-image.svg";
     };
 
     const fetchListings = async () => {
       try {
         const response = await axios.get("http://localhost:8000/api/ads/");
-        listings.value = response.data;
+        listings.value = response.data.map((listing) => ({
+          ...listing,
+          createdAt: listing.erstellungsdatum || null, // Map backend 'erstellungsdatum' to 'createdAt'
+          title: listing.titel,
+          price: listing.preis,
+          images: listing.bilder,
+          // Add other mappings if needed
+        }));
       } catch (error) {
         console.error("Error fetching listings:", error);
       }
@@ -67,6 +77,13 @@ export default {
 
     const goToListingDetail = (id) => {
       router.push({ name: "ListingDetail", params: { id: id } });
+    };
+
+    // Helper function to format date
+    const formatDate = (dateString) => {
+      if (!dateString) return "N/A";
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString();
     };
 
     onMounted(() => {
@@ -77,6 +94,7 @@ export default {
       listings,
       handleImageError,
       goToListingDetail,
+      formatDate,
     };
   },
 };
@@ -126,5 +144,11 @@ export default {
   font-size: 18px;
   font-weight: 600;
   color: #409eff;
+}
+
+.listing-date {
+  margin: 5px 0 0;
+  font-size: 12px;
+  color: #666;
 }
 </style>

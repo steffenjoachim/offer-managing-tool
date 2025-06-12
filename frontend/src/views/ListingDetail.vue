@@ -1,14 +1,14 @@
 <template>
   <div class="listing-detail-container">
-    <div v-if="listing">
-      <h2 class="listing-title-detail">{{ listing.titel }}</h2>
+    <div v-if="listing" class="listing-content-wrapper">
+      <h2 class="listing-title-detail">{{ listing.title }}</h2>
 
-      <div class="content-container">
+      <div class="main-content-area">
         <!-- Left Section: Main Image -->
         <div class="image-section">
           <img
-            v-if="listing.bilder && listing.bilder.length > 0"
-            :src="listing.bilder[0].bild"
+            v-if="listing.images && listing.images.length > 0"
+            :src="listing.images[0].bild"
             alt="Main Listing Image"
             class="main-detail-image"
           />
@@ -23,21 +23,23 @@
         <!-- Right Section: Details -->
         <div class="details-section">
           <div class="price-and-actions">
-            <p class="listing-price-detail">€{{ listing.preis }}</p>
+            <p class="listing-price-detail">Price: € {{ listing.price }}</p>
           </div>
 
-          <p class="listing-description">{{ listing.beschreibung }}</p>
+          <p class="listing-description">
+            Description: {{ listing.description }}
+          </p>
 
           <!-- Additional Images Container -->
           <div
             class="additional-images-container"
-            v-if="listing.bilder && listing.bilder.length > 1"
+            v-if="listing.images && listing.images.length > 1"
           >
             <!-- Wrapper for overflow hidden -->
             <div class="additional-images-wrapper">
               <div class="additional-images-list" ref="additionalImagesList">
                 <div
-                  v-for="(image, index) in listing.bilder.slice(1)"
+                  v-for="(image, index) in listing.images.slice(1)"
                   :key="index"
                   class="thumbnail-container"
                 >
@@ -69,10 +71,10 @@
           </div>
 
           <div class="seller-info">
-            <p>Seller: {{ listing.user }}</p>
+            <p>Seller: {{ listing.user ? listing.user.username : "N/A" }}</p>
             <p>
-              Created:
-              {{ new Date(listing.erstellungsdatum).toLocaleDateString() }}
+              Created at:
+              {{ formatDate(listing.createdAt) }}
             </p>
           </div>
         </div>
@@ -93,7 +95,7 @@
         />
       </div>
     </div>
-    <div v-else>
+    <div v-else class="loading-or-error">
       <p>Loading listing details...</p>
     </div>
   </div>
@@ -152,14 +154,30 @@ export default {
         const response = await axios.get(
           `http://localhost:8000/api/listings/${listingId}/`
         );
-        listing.value = response.data;
+        listing.value = {
+          ...response.data,
+          createdAt: response.data.erstellungsdatum || null, // HIER WURDE ES KORRIGIERT
+          title: response.data.titel,
+          description: response.data.beschreibung,
+          price: response.data.preis,
+          category: response.data.kategorie,
+          images: response.data.bilder,
+        };
         nextTick(() => {
           // Check if arrows are needed after images are rendered
           checkScrollArrowsNeeded();
         });
       } catch (error) {
         console.error("Error fetching listing details:", error);
+        showError("Failed to load listing details.");
       }
+    };
+
+    // Helper function to format date
+    const formatDate = (dateString) => {
+      if (!dateString) return "N/A";
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString();
     };
 
     // Function to check if scroll arrows are needed
@@ -167,8 +185,8 @@ export default {
       if (
         !additionalImagesList.value ||
         !listing.value ||
-        !listing.value.bilder ||
-        listing.value.bilder.length <= 1
+        !listing.value.images ||
+        listing.value.images.length <= 1
       ) {
         showLeftArrow.value = false;
         showRightArrow.value = false;
@@ -180,10 +198,10 @@ export default {
       const scrollWidth = Math.round(list.scrollWidth);
       const clientWidth = Math.round(list.clientWidth);
 
-      // Linken Pfeil anzeigen, wenn scrollLeft größer als 0 ist.
+      // Left arrow display, if scrollLeft is greater than 0.
       showLeftArrow.value = scrollLeft > 0;
 
-      // Rechten Pfeil anzeigen, wenn scrollLeft kleiner ist als die maximale Scrollposition.
+      // Right arrow display, if scrollLeft is less than the maximum scroll position.
       const maxScrollLeft = scrollWidth - clientWidth;
       showRightArrow.value = scrollLeft < maxScrollLeft;
     };
@@ -232,53 +250,25 @@ export default {
           listingId: listingId,
           content: messageData.content,
         });
-
-        showSuccess("Message sent successfully");
-        showMessageForm.value = false;
+        showSuccess("Message sent successfully!");
+        showMessageForm.value = false; // Close form after sending
       } catch (error) {
-        console.error(
-          "Fehler beim Senden der Nachricht:",
-          error.response?.data || error.message
-        );
-
-        let errorMessage = "An error occurred while sending the message";
-
-        try {
-          if (error.response?.data?.detail) {
-            if (
-              typeof error.response.data.detail === "string" &&
-              error.response.data.detail.includes(
-                "Sie können keine Nachricht an sich selbst senden"
-              )
-            ) {
-              errorMessage =
-                "You cannot send a message to yourself until another user initiates a conversation";
-            } else {
-              errorMessage = error.response.data.detail;
-            }
-          }
-        } catch (e) {
-          console.error("Error processing error message:", e);
-        }
-
-        showError(errorMessage);
+        console.error("Error sending message:", error);
+        showError("Failed to send message.");
       }
     };
 
     const addToWatchlist = async () => {
-      if (!listing.value || !listing.value.id) {
-        showError("Listing information not available.");
+      if (!listingId) {
+        showError("No listing ID available.");
         return;
       }
       try {
-        await store.dispatch(
-          "watchlist/addListingToWatchlist",
-          listing.value.id
-        );
+        await store.dispatch("watchlist/addListingToWatchlist", listingId);
         showSuccess("Listing added to watchlist!");
       } catch (error) {
         console.error("Error adding to watchlist:", error);
-        showError(error.message || "Failed to add listing to watchlist.");
+        showError("Failed to add listing to watchlist or already added.");
       }
     };
 
@@ -292,6 +282,7 @@ export default {
       showLeftArrow,
       showRightArrow,
       scrollAdditionalImages,
+      formatDate,
       showMessageForm,
       toggleMessageForm,
       handleMessageSent,
@@ -303,206 +294,206 @@ export default {
 
 <style scoped>
 .listing-detail-container {
-  padding: 20px;
   max-width: 1200px;
-  margin: 0 auto;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .listing-title-detail {
-  margin-bottom: 20px;
-  font-size: 28px;
+  font-size: 2.5em;
   color: #333;
+  margin-bottom: 20px;
+  text-align: center;
 }
 
-.content-container {
+.main-content-area {
   display: flex;
+  flex-wrap: wrap; /* Allows wrapping on smaller screens */
   gap: 30px;
   margin-bottom: 30px;
 }
 
 .image-section {
-  flex: 1;
-  min-width: 300px;
-}
-
-.details-section {
-  flex: 1;
-  min-width: 300px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.message-section {
-  width: 100%;
-  margin-top: 20px;
-  padding: 20px;
-  border-top: 1px solid #eee;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-  justify-content: center;
-}
-
-.action-buttons .el-button {
-  margin-left: 0;
-  min-width: 120px;
-  height: 40px;
-  white-space: nowrap;
+  flex: 2; /* Takes more space */
+  min-width: 300px; /* Minimum width before wrapping */
 }
 
 .main-detail-image {
   width: 100%;
   height: auto;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-height: 500px;
+  object-fit: contain; /* Ensures the whole image is visible */
+  border-radius: 6px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.details-section {
+  flex: 1; /* Takes remaining space */
+  min-width: 280px; /* Minimum width before wrapping */
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.price-and-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
 }
 
 .listing-price-detail {
-  font-size: 24px;
-  font-weight: bold;
+  font-size: 1.5rem;
   color: #409eff;
+  font-weight: bold;
   margin: 0;
 }
 
 .listing-description {
-  margin: 0;
+  font-size: 1.1em;
   color: #555;
   line-height: 1.6;
-  word-wrap: break-word;
-}
-
-.seller-info {
-  margin: 0;
-}
-
-.seller-info p {
-  margin-bottom: 5px;
-  color: #777;
-  font-size: 14px;
+  white-space: pre-wrap; /* Preserves whitespace and line breaks */
 }
 
 .additional-images-container {
-  margin: 0;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  position: relative;
+  width: 100%;
+  margin-top: 20px;
+  overflow: hidden; /* Hide scrollbar but allow scrolling */
+  padding: 10px 0; /* Padding for arrows */
 }
 
 .additional-images-wrapper {
-  overflow: hidden;
-  width: 100%;
+  overflow-x: auto; /* Enable horizontal scrolling */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
+  -ms-overflow-style: none; /* Hide scrollbar for IE/Edge */
+}
+
+.additional-images-wrapper::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for Chrome, Safari, Opera */
 }
 
 .additional-images-list {
   display: flex;
-  flex-direction: row;
-  gap: 10px;
-  overflow-y: hidden;
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-  padding-bottom: 10px;
-  width: 100%;
-}
-
-.additional-images-list::-webkit-scrollbar {
-  display: none;
+  gap: 15px;
+  padding: 5px;
+  scroll-behavior: smooth; /* Smooth scroll on arrow click */
 }
 
 .thumbnail-container {
-  flex-shrink: 0;
+  flex: 0 0 auto; /* Prevent stretching */
   width: 100px;
+  height: 100px;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.thumbnail-container:hover {
+  transform: scale(1.05);
   cursor: pointer;
-  margin-right: 15px;
-  display: inline-block;
 }
 
 .thumbnail-image {
   width: 100%;
-  height: auto;
-  display: block;
-  border-radius: 4px;
+  height: 100%;
+  object-fit: cover;
 }
 
 .image-navigation {
-  display: flex;
-  justify-content: center;
+  position: absolute;
+  top: 50%;
   width: 100%;
-  margin-top: 10px;
-  gap: 20px;
+  display: flex;
+  justify-content: space-between;
+  transform: translateY(-50%);
+  pointer-events: none; /* Allow clicks to pass through */
 }
 
 .image-nav-arrow {
-  background-color: rgba(255, 255, 255, 0.7);
-  border: 1px solid #ccc;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  padding: 10px 15px;
   border-radius: 50%;
-  width: 25px;
-  height: 25px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   cursor: pointer;
-  user-select: none;
+  font-size: 1.5em;
   z-index: 10;
-  font-size: 14px;
-  color: #333;
+  pointer-events: all; /* Re-enable clicks for arrows */
   transition: background-color 0.2s ease;
 }
 
 .image-nav-arrow:hover {
-  background-color: rgba(255, 255, 255, 1);
+  background-color: rgba(0, 0, 0, 0.7);
 }
 
+.image-nav-arrow.left {
+  margin-left: -15px; /* Adjust positioning */
+}
+
+.image-nav-arrow.right {
+  margin-right: -15px; /* Adjust positioning */
+}
+
+.seller-info {
+  margin-top: 20px;
+  border-top: 1px solid #eee;
+  padding-top: 15px;
+  font-size: 0.95em;
+  color: #666;
+}
+
+.seller-info p {
+  margin-bottom: 5px;
+}
+
+.message-section {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+  justify-content: center;
+}
+
+.loading-or-error {
+  text-align: center;
+  padding: 50px;
+  font-size: 1.2em;
+  color: #888;
+}
+
+/* Responsive adjustments */
 @media (max-width: 768px) {
-  .content-container {
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  .image-section {
+  .main-content-area {
     flex-direction: column;
   }
 
-  .additional-images-container {
-    margin-top: 20px;
+  .image-section,
+  .details-section {
+    min-width: unset;
+    width: 100%;
   }
 
-  .additional-images-list {
-    overflow-y: hidden;
-    gap: 15px;
+  .listing-title-detail {
+    font-size: 2em;
   }
 
-  .thumbnail-container {
-    width: 100px;
-    margin-right: 50px;
-  }
-
-  .thumbnail-image {
-    width: auto;
-    height: 100px;
-  }
-}
-
-@media (max-width: 850px) {
-  .price-and-actions {
-    flex-direction: column;
-    align-items: flex-start;
+  .listing-price-detail {
+    font-size: 1.2rem;
   }
 
   .action-buttons {
-    width: 100%;
-    margin-top: 10px;
-  }
-
-  .action-buttons .el-button {
-    flex: 1;
-    min-width: 0;
+    flex-direction: column;
   }
 }
 </style>

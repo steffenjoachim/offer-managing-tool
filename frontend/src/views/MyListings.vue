@@ -36,8 +36,8 @@
             >
               <el-card class="listing-card" shadow="hover">
                 <img
-                  v-if="listing.bilder && listing.bilder.length > 0"
-                  :src="listing.bilder[0].bild"
+                  v-if="listing.images && listing.images.length > 0"
+                  :src="listing.images[0].bild"
                   class="listing-image"
                   alt="Listing Image"
                 />
@@ -48,8 +48,12 @@
                   alt="No Image Available"
                 />
                 <div class="listing-info">
-                  <h3 class="listing-title">{{ listing.titel }}</h3>
-                  <p class="listing-price">€{{ listing.preis }}</p>
+                  <h3 class="listing-title">{{ listing.title }}</h3>
+                  <p class="listing-price">€{{ listing.price }}</p>
+                  <p class="listing-date">
+                    Created at:
+                    {{ formatDate(listing.createdAt) }}
+                  </p>
                   <div class="listing-actions">
                     <el-button
                       type="primary"
@@ -107,8 +111,15 @@ export default {
         const response = await axios.get(
           `http://localhost:8000/api/listings/?user_id=${userId}`
         );
-        listings.value = response.data;
-        console.log("MyListings: Fetched listings data:", listings.value);
+        listings.value = response.data.map((listing) => ({
+          ...listing,
+          createdAt: listing.erstellungsdatum || null, // Map backend 'erstellungsdatum' to 'createdAt'
+          title: listing.titel,
+          price: listing.preis,
+          images: listing.bilder,
+          // Add other mappings if needed
+        }));
+        console.log("MyListings: Fetched listing data:", listings.value);
       } catch (err) {
         error.value = err.message || "Error loading your listings";
         console.error("Error loading my listings:", err);
@@ -116,6 +127,13 @@ export default {
       } finally {
         loading.value = false;
       }
+    };
+
+    // Helper function to format date
+    const formatDate = (dateString) => {
+      if (!dateString) return "N/A";
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString();
     };
 
     // Watch for changes in the authenticated user object
@@ -172,6 +190,7 @@ export default {
       viewListing,
       deleteListing,
       navigateToCreateListing,
+      formatDate,
     };
   },
 };
@@ -233,7 +252,7 @@ export default {
 }
 
 .listing-title {
-  margin: 0 0 10px 0;
+  margin: 0;
   font-size: 16px;
   font-weight: bold;
   color: #333;
@@ -244,6 +263,12 @@ export default {
   font-size: 18px;
   color: #409eff;
   font-weight: bold;
+}
+
+.listing-date {
+  margin: 5px 0 0;
+  font-size: 12px;
+  color: #666;
 }
 
 .listing-actions {
