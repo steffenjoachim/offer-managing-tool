@@ -15,22 +15,22 @@
         label-position="top"
         @submit.prevent="handleSubmit"
       >
-        <el-form-item label="Title" prop="titel">
-          <el-input v-model="form.titel" placeholder="Enter listing title" />
+        <el-form-item label="Title" prop="title">
+          <el-input v-model="form.title" placeholder="Enter listing title" />
         </el-form-item>
 
-        <el-form-item label="Description" prop="beschreibung">
+        <el-form-item label="Description" prop="description">
           <el-input
-            v-model="form.beschreibung"
+            v-model="form.description"
             type="textarea"
             :rows="4"
             placeholder="Describe your item"
           />
         </el-form-item>
 
-        <el-form-item label="Price" prop="preis">
+        <el-form-item label="Price" prop="price">
           <el-input-number
-            v-model="form.preis"
+            v-model="form.price"
             :min="0"
             :precision="2"
             :step="0.01"
@@ -38,8 +38,8 @@
           />
         </el-form-item>
 
-        <el-form-item label="Category" prop="kategorie">
-          <el-select v-model="form.kategorie" placeholder="Select category">
+        <el-form-item label="Category" prop="category">
+          <el-select v-model="form.category" placeholder="Select category">
             <el-option label="Electronics" value="electronics" />
             <el-option label="Furniture" value="furniture" />
             <el-option label="Clothing" value="clothing" />
@@ -48,7 +48,7 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="Images" prop="bilder">
+        <el-form-item label="Images" prop="images">
           <el-upload
             :file-list="fileList"
             action="#"
@@ -91,15 +91,16 @@ export default {
     const fileList = ref([]);
 
     const form = reactive({
-      titel: "",
-      beschreibung: "",
-      preis: 0,
-      kategorie: "",
-      bilder: [],
+      title: "",
+      description: "",
+      price: 0,
+      category: "",
+      images: [],
+      createdAt: new Date().toISOString(),
     });
 
     const rules = {
-      titel: [
+      title: [
         { required: true, message: "Please enter a title", trigger: "blur" },
         {
           min: 3,
@@ -108,17 +109,17 @@ export default {
           trigger: "blur",
         },
       ],
-      beschreibung: [
+      description: [
         {
           required: true,
           message: "Please enter a description",
           trigger: "blur",
         },
       ],
-      preis: [
+      price: [
         { required: true, message: "Please enter a price", trigger: "blur" },
       ],
-      kategorie: [
+      category: [
         {
           required: true,
           message: "Please select a category",
@@ -128,7 +129,7 @@ export default {
     };
 
     const handleFileChange = (file) => {
-      form.bilder.push(file.raw);
+      form.images.push(file.raw);
     };
 
     const handleSubmit = async () => {
@@ -139,11 +140,12 @@ export default {
         loading.value = true;
 
         const formData = new FormData();
-        formData.append("titel", form.titel);
-        formData.append("beschreibung", form.beschreibung);
-        formData.append("preis", form.preis);
-        formData.append("kategorie", form.kategorie);
-        form.bilder.forEach((file) => {
+        formData.append("titel", form.title);
+        formData.append("beschreibung", form.description);
+        formData.append("preis", form.price);
+        formData.append("kategorie", form.category);
+        formData.append("erstellungsdatum", form.createdAt);
+        form.images.forEach((file) => {
           formData.append("bilder", file);
         });
 
