@@ -1,5 +1,5 @@
 <template>
-  <div class="home-container">
+  <div class="content-wrapper">
     <div class="search-container">
       <el-input
         v-model="searchQuery"
@@ -62,6 +62,8 @@ import { useRouter } from "vue-router";
 import axios from "axios";
 import { Search } from "@element-plus/icons-vue";
 
+const VALIDITY_DAYS = 3; // For testing, listings are valid for 3 days
+
 export default {
   name: "HomePage",
   components: {
@@ -82,13 +84,23 @@ export default {
     const fetchListings = async () => {
       try {
         const response = await axios.get("http://localhost:8000/api/ads/");
-        const mappedListings = response.data.map((listing) => ({
-          ...listing,
-          createdAt: listing.erstellungsdatum || null,
-          title: listing.titel,
-          price: listing.preis,
-          images: listing.bilder,
-        }));
+        const now = new Date();
+        const mappedListings = response.data
+          .map((listing) => ({
+            ...listing,
+            createdAt: listing.erstellungsdatum || null,
+            title: listing.titel,
+            price: listing.preis,
+            images: listing.bilder,
+            beschreibung: listing.beschreibung,
+          }))
+          .filter((listing) => {
+            if (!listing.createdAt) return false; // Listings without a creation date are invalid
+            const createdDate = new Date(listing.createdAt);
+            const expirationDate = new Date(createdDate);
+            expirationDate.setDate(createdDate.getDate() + VALIDITY_DAYS);
+            return expirationDate.getTime() > now.getTime(); // Keep only listings that have not expired
+          });
         listings.value = mappedListings;
         originalListings.value = mappedListings;
       } catch (error) {
@@ -139,22 +151,17 @@ export default {
 </script>
 
 <style scoped>
-.home-container {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
+/* Use .content-wrapper from App.vue for consistent alignment */
+/* Remove .home-container specific padding and max-width as content-wrapper handles it */
 
 .search-container {
   margin-bottom: 32px;
 }
 
 .search-input {
-  width: 100%;
-  width: 700px !important;
+  width: 100%; /* Macht das Feld so breit wie sein übergeordnetes Element */
   display: block;
-  margin-left: 0;
-  margin-right: auto;
+  margin: 0 auto; /* Zentrieren des Suchfeldes innerhalb des content-wrapper */
 }
 
 .search-input :deep(.el-input__wrapper) {
@@ -162,7 +169,7 @@ export default {
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   border-radius: 8px;
   transition: all 0.3s ease;
-  width: 250px
+  width: 100%; /* Sicherstellen, dass der Wrapper die volle Breite einnimmt */
 }
 
 .search-input :deep(.el-input__wrapper:hover) {
@@ -173,6 +180,8 @@ export default {
   font-size: 16px;
   height: 24px;
   line-height: 24px;
+  width: 100%; /* Sicherstellen, dass der innere Input die volle Breite einnimmt */
+  /* min-width and max-width removed to rely on parent's width */
 }
 
 .search-input :deep(.el-input__prefix) {
