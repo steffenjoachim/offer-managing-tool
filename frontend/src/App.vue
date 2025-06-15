@@ -128,6 +128,9 @@ export default {
   display: flex;
   align-items: center;
   height: 60px;
+  padding: 0 20px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .flex-grow {
