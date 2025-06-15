@@ -54,6 +54,9 @@
                     Created at:
                     {{ formatDate(listing.createdAt) }}
                   </p>
+                  <p class="listing-validity">
+                    Validity: {{ getValidityStatus(listing.createdAt) }}
+                  </p>
                   <div class="listing-actions">
                     <el-button
                       type="primary"
@@ -88,6 +91,8 @@ import axios from "axios";
 import { Tickets } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
+const VALIDITY_DAYS = 3; // For testing, listings are valid for 3 days
+
 export default {
   name: "MyListings",
   components: {
@@ -111,14 +116,22 @@ export default {
         const response = await axios.get(
           `http://localhost:8000/api/listings/?user_id=${userId}`
         );
-        listings.value = response.data.map((listing) => ({
-          ...listing,
-          createdAt: listing.erstellungsdatum || null, // Map backend 'erstellungsdatum' to 'createdAt'
-          title: listing.titel,
-          price: listing.preis,
-          images: listing.bilder,
-          // Add other mappings if needed
-        }));
+        const now = new Date();
+        listings.value = response.data
+          .map((listing) => ({
+            ...listing,
+            createdAt: listing.erstellungsdatum || null, // Map backend 'erstellungsdatum' to 'createdAt'
+            title: listing.titel,
+            price: listing.preis,
+            images: listing.bilder,
+          }))
+          .filter((listing) => {
+            if (!listing.createdAt) return false; // Listings without a creation date are invalid
+            const createdDate = new Date(listing.createdAt);
+            const expirationDate = new Date(createdDate);
+            expirationDate.setDate(createdDate.getDate() + VALIDITY_DAYS);
+            return expirationDate.getTime() > now.getTime(); // Keep only listings that have not expired
+          });
         console.log("MyListings: Fetched listing data:", listings.value);
       } catch (err) {
         error.value = err.message || "Error loading your listings";
@@ -134,6 +147,35 @@ export default {
       if (!dateString) return "N/A";
       const date = new Date(dateString);
       return isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString();
+    };
+
+    // Helper function to get validity status
+    const getValidityStatus = (createdAtString) => {
+      if (!createdAtString) return "N/A";
+
+      // Setze die Zeit auf Mitternacht für beide Daten
+      const createdDate = new Date(createdAtString);
+      createdDate.setHours(0, 0, 0, 0);
+
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+
+      const expirationDate = new Date(createdDate);
+      expirationDate.setDate(createdDate.getDate() + VALIDITY_DAYS);
+
+      // Berechne die Differenz in Tagen
+      const diffTime = expirationDate.getTime() - now.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays > 0) {
+        return `Expires in ${diffDays} day${diffDays === 1 ? "" : "s"}`;
+      } else if (diffDays === 0) {
+        return "Expires today";
+      } else {
+        return `Expired ${Math.abs(diffDays)} day${
+          Math.abs(diffDays) === 1 ? "" : "s"
+        } ago`;
+      }
     };
 
     // Watch for changes in the authenticated user object
@@ -191,6 +233,7 @@ export default {
       deleteListing,
       navigateToCreateListing,
       formatDate,
+      getValidityStatus,
     };
   },
 };
@@ -269,6 +312,12 @@ export default {
   margin: 5px 0 0;
   font-size: 12px;
   color: #666;
+}
+
+.listing-validity {
+  margin: 5px 0 0;
+  font-size: 14px;
+  color: #606266;
 }
 
 .listing-actions {
