@@ -72,6 +72,12 @@
 
           <div class="seller-info">
             <p>Seller: {{ listing.user ? listing.user.username : "N/A" }}</p>
+            <p
+              v-if="listing.user && listing.user.date_joined"
+              class="member-since-info"
+            >
+              Member since: {{ formatDate(listing.user.date_joined) }}
+            </p>
             <p>
               Created at:
               {{ formatDate(listing.createdAt) }}
@@ -450,6 +456,13 @@ export default {
 
 .seller-info p {
   margin-bottom: 5px;
+}
+
+.member-since-info {
+  font-size: 0.85em; /* Slightly smaller than seller info */
+  margin-top: -3px; /* Move closer to seller info */
+  margin-bottom: 8px; /* Maintain some spacing to next element */
+  color: #777;
 }
 
 .message-section {

@@ -12,7 +12,7 @@ class AnzeigeBildSerializer(serializers.ModelSerializer):
 class SimpleUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username']
+        fields = ['id', 'username', 'date_joined']
 
 class AnzeigeSerializer(serializers.ModelSerializer):
     user = SimpleUserSerializer(read_only=True)
