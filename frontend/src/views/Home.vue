@@ -1,5 +1,19 @@
 <template>
   <div class="home-container">
+    <div class="search-container">
+      <el-input
+        v-model="searchQuery"
+        placeholder="Search Listings for Products"
+        class="search-input"
+        @input="handleSearch"
+        size="large"
+      >
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+      </el-input>
+    </div>
+
     <h1 class="section-title">Recommended Listings for You:</h1>
 
     <el-row :gutter="10">
@@ -46,13 +60,19 @@ import { ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import axios from "axios";
+import { Search } from "@element-plus/icons-vue";
 
 export default {
   name: "HomePage",
+  components: {
+    Search,
+  },
   setup() {
     const store = useStore();
     const listings = ref([]);
     const router = useRouter();
+    const searchQuery = ref("");
+    const originalListings = ref([]);
 
     const handleImageError = (e) => {
       console.error("Image could not be loaded:", e);
@@ -62,17 +82,33 @@ export default {
     const fetchListings = async () => {
       try {
         const response = await axios.get("http://localhost:8000/api/ads/");
-        listings.value = response.data.map((listing) => ({
+        const mappedListings = response.data.map((listing) => ({
           ...listing,
-          createdAt: listing.erstellungsdatum || null, // Map backend 'erstellungsdatum' to 'createdAt'
+          createdAt: listing.erstellungsdatum || null,
           title: listing.titel,
           price: listing.preis,
           images: listing.bilder,
-          // Add other mappings if needed
         }));
+        listings.value = mappedListings;
+        originalListings.value = mappedListings;
       } catch (error) {
         console.error("Error fetching listings:", error);
       }
+    };
+
+    const handleSearch = () => {
+      if (!searchQuery.value.trim()) {
+        listings.value = originalListings.value;
+        return;
+      }
+
+      const query = searchQuery.value.toLowerCase();
+      listings.value = originalListings.value.filter(
+        (listing) =>
+          listing.title.toLowerCase().includes(query) ||
+          (listing.beschreibung &&
+            listing.beschreibung.toLowerCase().includes(query))
+      );
     };
 
     const goToListingDetail = (id) => {
@@ -95,6 +131,8 @@ export default {
       handleImageError,
       goToListingDetail,
       formatDate,
+      searchQuery,
+      handleSearch,
     };
   },
 };
@@ -103,6 +141,44 @@ export default {
 <style scoped>
 .home-container {
   padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.search-container {
+  margin-bottom: 32px;
+}
+
+.search-input {
+  width: 100%;
+  width: 700px !important;
+  display: block;
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.search-input :deep(.el-input__wrapper) {
+  padding: 12px 16px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  width: 250px
+}
+
+.search-input :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.15);
+}
+
+.search-input :deep(.el-input__inner) {
+  font-size: 16px;
+  height: 24px;
+  line-height: 24px;
+}
+
+.search-input :deep(.el-input__prefix) {
+  font-size: 18px;
+  color: #909399;
+  margin-right: 8px;
 }
 
 .section-title {
@@ -110,6 +186,14 @@ export default {
   font-size: 24px;
   font-weight: 600;
   color: #303133;
+}
+
+.el-row {
+  margin: 0 -10px;
+}
+
+.el-col {
+  padding: 0 10px;
 }
 
 .listing-card {
