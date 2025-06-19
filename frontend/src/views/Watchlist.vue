@@ -33,8 +33,8 @@
             >
               <el-card class="listing-card" shadow="hover">
                 <img
-                  v-if="item.listing.bilder && item.listing.bilder.length > 0"
-                  :src="item.listing.bilder[0].bild"
+                  v-if="item.images && item.images.length > 0"
+                  :src="item.images[0].image"
                   class="listing-image"
                   alt="Listing Image"
                 />
@@ -45,20 +45,20 @@
                   alt="No Image Available"
                 />
                 <div class="listing-info">
-                  <h3 class="listing-title">{{ item.listing.titel }}</h3>
-                  <p class="listing-price">€{{ item.listing.preis }}</p>
+                  <h3 class="listing-title">{{ item.title }}</h3>
+                  <p class="listing-price">€{{ item.price }}</p>
                   <div class="listing-actions">
                     <el-button
                       type="primary"
                       size="small"
-                      @click="viewListing(item.listing.id)"
+                      @click="viewListing(item.id)"
                     >
                       View
                     </el-button>
                     <el-button
                       type="danger"
                       size="small"
-                      @click="removeFromWatchlist(item.listing.id)"
+                      @click="removeFromWatchlist(item.id)"
                     >
                       Remove
                     </el-button>
@@ -84,6 +84,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { Star } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
+import axios from "axios";
 
 export default {
   name: "WatchlistView",
@@ -99,18 +100,21 @@ export default {
 
     const fetchWatchlist = async () => {
       try {
-        loading.value = true;
-        const response = await store.dispatch("watchlist/fetchWatchlist");
-        // Sortiere die Merkliste so, dass neuere Einträge zuerst angezeigt werden
-        watchlist.value = response.sort(
-          (a, b) => new Date(b.added_at) - new Date(a.added_at)
+        const response = await axios.get(
+          "http://localhost:8000/api/watchlist/"
         );
-        error.value = null;
-      } catch (err) {
-        error.value = "Error loading watchlist";
-        console.error("Error loading watchlist:", err);
-      } finally {
-        loading.value = false;
+        watchlist.value = response.data.map((listing) => ({
+          ...listing,
+          createdAt: listing.created_at || null,
+          title: listing.title,
+          description: listing.description,
+          price: listing.price,
+          category: listing.category,
+          images: listing.images,
+        }));
+      } catch (error) {
+        console.error("Error fetching watchlist:", error);
+        showError("Failed to load your watchlist.");
       }
     };
 

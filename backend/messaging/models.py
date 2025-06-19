@@ -1,14 +1,14 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from ads.models import Anzeige
+from ads.models import Listing
 
 User = get_user_model()
 
 class Conversation(models.Model):
     participants = models.ManyToManyField(User, related_name='conversations')
     listing = models.ForeignKey(
-        Anzeige,
+        Listing,
         on_delete=models.CASCADE,
         related_name='conversations',
         verbose_name='Anzeige',
@@ -29,29 +29,14 @@ class Conversation(models.Model):
 class Message(models.Model):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
-    empfaenger = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='received_messages',
-        verbose_name='Empfänger'
-    )
-    anzeige = models.ForeignKey(
-        Anzeige,
-        on_delete=models.CASCADE,
-        related_name='messages',
-        verbose_name='Anzeige',
-        null=True,
-        blank=True
-    )
-    text = models.TextField(verbose_name='Nachrichtentext', blank=True, null=True)
-    file = models.FileField(upload_to='message_files/', blank=True, null=True)
-    timestamp = models.DateTimeField(default=timezone.now)
-    is_read = models.BooleanField(default=False, verbose_name='Gelesen')
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages')
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='messages')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
 
     class Meta:
-        ordering = ['timestamp']
-        verbose_name = 'Nachricht'
-        verbose_name_plural = 'Nachrichten'
+        ordering = ['-created_at']
 
     def __str__(self):
-        return f"Nachricht von {self.sender.username} an {self.empfaenger.username} ({self.timestamp})"
+        return f"Message from {self.sender} to {self.recipient} about {self.listing}"

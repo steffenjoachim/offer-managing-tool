@@ -16,42 +16,48 @@
 
     <h1 class="section-title">Recommended Listings for You:</h1>
 
-    <el-row :gutter="10">
-      <el-col
-        v-for="listing in listings"
-        :key="listing.id"
-        :xs="12"
-        :sm="8"
-        :md="6"
-        :lg="4"
-      >
-        <el-card
-          class="listing-card"
-          :body-style="{ padding: '0px' }"
-          @click="goToListingDetail(listing.id)"
+    <div class="listings-container">
+      <el-row :gutter="10" justify="center">
+        <el-col
+          v-for="listing in listings"
+          :key="listing.id"
+          :xs="24"
+          :sm="12"
+          :md="8"
+          :lg="6"
         >
-          <img
-            :src="
-              Array.isArray(listing.images) && listing.images.length > 0
-                ? listing.images[0].bild
-                : typeof listing.images === 'string'
-                ? listing.images
-                : '/images/placeholder-image.svg'
-            "
-            class="listing-image"
-            @error="handleImageError"
-            alt="Listing Image"
-          />
-          <div class="listing-info">
-            <h3 class="listing-title">{{ listing.title }}</h3>
-            <p class="listing-price">€{{ listing.price }}</p>
-            <p class="listing-date">
-              Created at: {{ formatDate(listing.createdAt) }}
-            </p>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+          <el-card
+            class="listing-card"
+            :body-style="{ padding: '0px' }"
+            @click="goToListingDetail(listing.id)"
+          >
+            <img
+              :src="
+                Array.isArray(listing.images) && listing.images.length > 0
+                  ? listing.images[0].image
+                  : typeof listing.images === 'string'
+                  ? listing.images
+                  : '/images/placeholder-image.svg'
+              "
+              class="listing-image"
+              @error="handleImageError"
+              alt="Listing Image"
+            />
+            <div class="listing-info">
+              <h3 class="listing-title">{{ listing.title }}</h3>
+              <p class="listing-price">€{{ listing.price }}</p>
+              <p class="listing-date">
+                Created at: {{ formatDate(listing.created_at) }}
+              </p>
+              <p class="listing-description">
+                <span class="desc-label">Description:</span>
+                {{ listing.description }}
+              </p>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+    </div>
   </div>
 </template>
 
@@ -75,6 +81,8 @@ export default {
     const router = useRouter();
     const searchQuery = ref("");
     const originalListings = ref([]);
+    const loading = ref(false);
+    const error = ref(null);
 
     const handleImageError = (e) => {
       console.error("Image could not be loaded:", e);
@@ -83,28 +91,29 @@ export default {
 
     const fetchListings = async () => {
       try {
-        const response = await axios.get("http://localhost:8000/api/ads/");
-        const now = new Date();
-        const mappedListings = response.data
-          .map((listing) => ({
-            ...listing,
-            createdAt: listing.erstellungsdatum || null,
-            title: listing.titel,
-            price: listing.preis,
-            images: listing.bilder,
-            beschreibung: listing.beschreibung,
-          }))
-          .filter((listing) => {
-            if (!listing.createdAt) return false; // Listings without a creation date are invalid
-            const createdDate = new Date(listing.createdAt);
-            const expirationDate = new Date(createdDate);
-            expirationDate.setDate(createdDate.getDate() + VALIDITY_DAYS);
-            return expirationDate.getTime() > now.getTime(); // Keep only listings that have not expired
-          });
-        listings.value = mappedListings;
-        originalListings.value = mappedListings;
-      } catch (error) {
-        console.error("Error fetching listings:", error);
+        loading.value = true;
+        error.value = null;
+        const response = await axios.get("http://localhost:8000/api/listings/");
+        listings.value = response.data.results.map((listing) => ({
+          ...listing,
+          created_at: listing.created_at || null,
+          title: listing.title,
+          description: listing.description,
+          price: listing.price,
+          category: listing.category,
+          images: listing.images,
+        }));
+        // Filter out listings without creation date
+        listings.value = listings.value.filter((listing) => listing.created_at);
+        // Filter out expired listings
+        listings.value = listings.value.filter(
+          (listing) => !isExpired(listing)
+        );
+      } catch (err) {
+        console.error("Error fetching listings:", err);
+        error.value = "Failed to load listings";
+      } finally {
+        loading.value = false;
       }
     };
 
@@ -118,8 +127,8 @@ export default {
       listings.value = originalListings.value.filter(
         (listing) =>
           listing.title.toLowerCase().includes(query) ||
-          (listing.beschreibung &&
-            listing.beschreibung.toLowerCase().includes(query))
+          (listing.description &&
+            listing.description.toLowerCase().includes(query))
       );
     };
 
@@ -134,114 +143,133 @@ export default {
       return isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString();
     };
 
+    const isExpired = (listing) => {
+      if (!listing.created_at) return true;
+      const createdDate = new Date(listing.created_at);
+      const expirationDate = new Date(createdDate);
+      expirationDate.setDate(createdDate.getDate() + VALIDITY_DAYS);
+      const now = new Date();
+      return expirationDate.getTime() < now.getTime();
+    };
+
     onMounted(() => {
       fetchListings();
     });
 
     return {
       listings,
-      handleImageError,
-      goToListingDetail,
-      formatDate,
       searchQuery,
       handleSearch,
+      loading,
+      error,
+      formatDate,
+      handleImageError,
+      goToListingDetail,
     };
   },
 };
 </script>
 
 <style scoped>
-/* Use .content-wrapper from App.vue for consistent alignment */
-/* Remove .home-container specific padding and max-width as content-wrapper handles it */
+.content-wrapper {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
+}
 
 .search-container {
-  margin-bottom: 32px;
+  margin-bottom: 30px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .search-input {
-  width: 100%; /* Macht das Feld so breit wie sein übergeordnetes Element */
-  display: block;
-  margin: 0 auto; /* Zentrieren des Suchfeldes innerhalb des content-wrapper */
-}
-
-.search-input :deep(.el-input__wrapper) {
-  padding: 12px 16px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  width: 100%; /* Sicherstellen, dass der Wrapper die volle Breite einnimmt */
-}
-
-.search-input :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.15);
-}
-
-.search-input :deep(.el-input__inner) {
-  font-size: 16px;
-  height: 24px;
-  line-height: 24px;
-  width: 100%; /* Sicherstellen, dass der innere Input die volle Breite einnimmt */
-  /* min-width and max-width removed to rely on parent's width */
-}
-
-.search-input :deep(.el-input__prefix) {
-  font-size: 18px;
-  color: #909399;
-  margin-right: 8px;
+  width: 100%;
 }
 
 .section-title {
-  margin-bottom: 24px;
+  text-align: center;
+  margin-bottom: 30px;
+  color: #333;
   font-size: 24px;
-  font-weight: 600;
-  color: #303133;
 }
 
-.el-row {
-  margin: 0 -10px;
+.listings-container {
+  width: 100%;
+  margin: 0 auto;
 }
 
-.el-col {
-  padding: 0 10px;
+.listings-container .el-row {
+  row-gap: 16px;
 }
 
 .listing-card {
-  margin-bottom: 10px;
-  transition: transform 0.3s;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  height: 100%;
 }
 
 .listing-card:hover {
   transform: translateY(-5px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .listing-image {
   width: 100%;
   height: 200px;
   object-fit: cover;
-  object-position: 50% 30%;
+  border-radius: 4px 4px 0 0;
 }
 
 .listing-info {
-  padding: 14px;
+  padding: 15px;
 }
 
 .listing-title {
   margin: 0;
   font-size: 16px;
-  font-weight: 500;
-  color: #303133;
+  font-weight: bold;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .listing-price {
-  margin: 8px 0 0;
+  margin: 8px 0;
   font-size: 18px;
-  font-weight: 600;
   color: #409eff;
+  font-weight: bold;
 }
 
 .listing-date {
-  margin: 5px 0 0;
+  margin: 0;
   font-size: 12px;
-  color: #666;
+  color: #999;
+}
+
+.listing-description {
+  font-size: 1.1em;
+  color: #555;
+  line-height: 1.6;
+  white-space: pre-line;
+  margin: 0;
+}
+
+.desc-label {
+  display: inline-block;
+  min-width: 100px;
+  font-weight: 500;
+  color: #222;
+}
+
+@media (max-width: 1024px) {
+  /* Abstand wird jetzt über :gutter im el-row gesetzt */
+}
+@media (max-width: 768px) {
+  /* Abstand wird jetzt über :gutter im el-row gesetzt */
 }
 </style>

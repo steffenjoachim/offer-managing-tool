@@ -37,7 +37,7 @@
               <el-card class="listing-card" shadow="hover">
                 <img
                   v-if="listing.images && listing.images.length > 0"
-                  :src="listing.images[0].bild"
+                  :src="listing.images[0].image"
                   class="listing-image"
                   alt="Listing Image"
                 />
@@ -52,10 +52,10 @@
                   <p class="listing-price">€{{ listing.price }}</p>
                   <p class="listing-date">
                     Created at:
-                    {{ formatDate(listing.createdAt) }}
+                    {{ formatDate(listing.created_at) }}
                   </p>
                   <p class="listing-validity">
-                    Validity: {{ getValidityStatus(listing.createdAt) }}
+                    Validity: {{ getValidityStatus(listing.created_at) }}
                   </p>
                   <div class="listing-actions">
                     <el-button
@@ -105,38 +105,47 @@ export default {
     const error = ref(null);
     const listings = ref([]);
 
-    const fetchMyListings = async (userId) => {
+    const showError = (message) => {
       try {
-        loading.value = true;
-        error.value = null; // Clear any previous errors
-        if (!userId) {
-          loading.value = false;
-          return;
-        }
+        ElMessage({
+          message: message,
+          type: "error",
+          duration: 3000,
+        });
+      } catch (e) {
+        console.error("Error showing message:", e);
+      }
+    };
+
+    const showSuccess = (message) => {
+      try {
+        ElMessage({
+          message: message,
+          type: "success",
+          duration: 3000,
+        });
+      } catch (e) {
+        console.error("Error showing message:", e);
+      }
+    };
+
+    const fetchMyListings = async () => {
+      try {
         const response = await axios.get(
-          `http://localhost:8000/api/listings/?user_id=${userId}`
+          "http://localhost:8000/api/listings/my/"
         );
-        const now = new Date();
-        listings.value = response.data
-          .map((listing) => ({
-            ...listing,
-            createdAt: listing.erstellungsdatum || null, // Map backend 'erstellungsdatum' to 'createdAt'
-            title: listing.titel,
-            price: listing.preis,
-            images: listing.bilder,
-          }))
-          .filter((listing) => {
-            if (!listing.createdAt) return false; // Listings without a creation date are invalid
-            const createdDate = new Date(listing.createdAt);
-            const expirationDate = new Date(createdDate);
-            expirationDate.setDate(createdDate.getDate() + VALIDITY_DAYS);
-            return expirationDate.getTime() > now.getTime(); // Keep only listings that have not expired
-          });
-        console.log("MyListings: Fetched listing data:", listings.value);
-      } catch (err) {
-        error.value = err.message || "Error loading your listings";
-        console.error("Error loading my listings:", err);
-        ElMessage.error(error.value);
+        listings.value = response.data.results.map((listing) => ({
+          ...listing,
+          created_at: listing.created_at || null,
+          title: listing.title,
+          description: listing.description,
+          price: listing.price,
+          category: listing.category,
+          images: listing.images,
+        }));
+      } catch (error) {
+        console.error("Error fetching my listings:", error);
+        showError("Failed to load your listings.");
       } finally {
         loading.value = false;
       }

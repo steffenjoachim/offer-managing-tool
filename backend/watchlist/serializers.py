@@ -1,9 +1,9 @@
 from rest_framework import serializers
 from .models import WatchlistItem
-from ads.serializers import AnzeigeSerializer
+from ads.serializers import ListingSerializer
 
 class WatchlistItemSerializer(serializers.ModelSerializer):
-    listing = AnzeigeSerializer(read_only=True) # AnzeigeSerializer einbetten
+    listing = ListingSerializer(read_only=True)
 
     class Meta:
         model = WatchlistItem
