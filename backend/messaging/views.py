@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from .models import Message, Conversation
-from ads.models import Anzeige # Importiere das Anzeigen-Modell
+from ads.models import Listing
 from .serializers import MessageSerializer, MessageCreateSerializer, ConversationSerializer
 from django.contrib.auth import get_user_model
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -71,12 +71,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
 class MessageViewSet(viewsets.ModelViewSet):
     # serializer_class wird dynamisch in get_serializer_class bestimmt
+    queryset = Message.objects.all()
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
-
-    def get_queryset(self):
-        conversation_id = self.kwargs.get('conversation_pk')
-        return Message.objects.filter(conversation_id=conversation_id)
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -151,90 +148,61 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def send_message(self, request):
-        """
-        Sendet eine neue Nachricht im Kontext einer Anzeige.
-        Erwartet: listingId, content (text) oder file.
-        """
-        listing_id = request.data.get('listingId')
+        listing_id = request.data.get('listing_id')
         content = request.data.get('content')
         file = request.data.get('file')
-
-        if not listing_id:
-            return Response({'detail': 'listingId ist erforderlich.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if not content and not file:
-            return Response({'detail': 'Nachrichtentext oder Datei ist erforderlich.'}, status=status.HTTP_400_BAD_REQUEST)
-
         try:
-            anzeige = Anzeige.objects.get(id=listing_id)
+            listing = Listing.objects.get(id=listing_id)
             sender = request.user
-
-            # Die beiden Kernparteien sind der Sender und der Ersteller der Anzeige.
             user1 = sender
-            user2 = anzeige.user
-
-            # Bestimme den Empfänger basierend auf den Teilnehmern der Konversation.
-            if sender == anzeige.user:
+            user2 = listing.user
+            if sender == listing.user:
                 other_participants = Conversation.objects.filter(
-                    listing=anzeige,
+                    listing=listing,
                     participants=sender
                 ).exclude(participants=sender).first()
-
                 if other_participants:
                     conversation = other_participants
-                    empfaenger = conversation.participants.exclude(id=sender.id).first()
+                    recipient = conversation.participants.exclude(id=sender.id).first()
                 else:
-                    print(f"Versuch, Nachricht als Anzeigen-Ersteller {sender.username} zu senden, aber kein anderer Teilnehmer in Konversation für Anzeige {anzeige.id} gefunden.")
-                    return Response({'detail': 'Sie können keine Nachricht an sich selbst senden, solange kein anderer Benutzer eine Konversation initiiert hat.'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'detail': 'You cannot message yourself unless another user has started a conversation.'}, status=status.HTTP_400_BAD_REQUEST)
             else:
-                empfaenger = anzeige.user
-                conversation, created = Conversation.objects.get_or_create(listing=anzeige)
+                recipient = listing.user
+                conversation, created = Conversation.objects.get_or_create(listing=listing)
                 conversation.participants.add(user1, user2)
-
-            # Erstelle die neue Nachricht
             message = Message.objects.create(
                 conversation=conversation,
                 sender=sender,
-                empfaenger=empfaenger,
-                text=content,
+                recipient=recipient,
+                content=content,
                 file=file,
             )
-
-            # Serialisiere die erstellte Nachricht und gib sie zurück
             serializer = MessageSerializer(message)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        except Anzeige.DoesNotExist:
-            return Response({'detail': 'Anzeige nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
+        except Listing.DoesNotExist:
+            return Response({'detail': 'Listing not found.'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            print(f"Fehler beim Senden der Nachricht: {e}")
-            return Response({'detail': 'Ein interner Serverfehler ist beim Senden der Nachricht aufgetreten.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'detail': 'Internal server error while sending message.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=['get'])
-    def by_anzeige(self, request):
-        # Gibt Nachrichten zurück, die sich auf eine bestimmte Anzeige beziehen
-        anzeige_id = request.query_params.get('anzeige_id', None)
-        if not anzeige_id:
-            return Response({'detail': 'Bitte geben Sie eine anzeige_id an.'}, status=status.HTTP_400_BAD_REQUEST)
-
+    def by_listing(self, request):
+        listing_id = request.query_params.get('listing_id', None)
+        if not listing_id:
+            return Response({'detail': 'Please provide a listing_id.'}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            anzeige = Anzeige.objects.get(id=anzeige_id)
-            # Stelle sicher, dass der Benutzer berechtigt ist
-            if anzeige.user == request.user or Conversation.objects.filter(listing=anzeige, participants=request.user).exists():
-                # Finde die Konversation für diese Anzeige und den aktuellen Benutzer
-                conversation = Conversation.objects.filter(listing=anzeige, participants=request.user).first()
+            listing = Listing.objects.get(id=listing_id)
+            if listing.user == request.user or Conversation.objects.filter(listing=listing, participants=request.user).exists():
+                conversation = Conversation.objects.filter(listing=listing, participants=request.user).first()
                 if conversation:
-                     messages = Message.objects.filter(conversation=conversation).order_by('timestamp')
-                     serializer = self.get_serializer(messages, many=True)
-                     return Response(serializer.data)
+                    messages = Message.objects.filter(conversation=conversation).order_by('created_at')
+                    serializer = self.get_serializer(messages, many=True)
+                    return Response(serializer.data)
                 else:
-                     return Response({'detail': 'Keine Konversation für diese Anzeige gefunden.'}, status=status.HTTP_404_NOT_FOUND)
-
+                    return Response({'detail': 'No conversation for this listing found.'}, status=status.HTTP_404_NOT_FOUND)
             else:
-                 return Response({'detail': 'Sie sind nicht berechtigt, Nachrichten für diese Anzeige anzuzeigen.'}, status=status.HTTP_403_FORBIDDEN)
-
-        except Anzeige.DoesNotExist:
-            return Response({'detail': 'Anzeige nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'detail': 'You are not authorized to view messages for this listing.'}, status=status.HTTP_403_FORBIDDEN)
+        except Listing.DoesNotExist:
+            return Response({'detail': 'Listing not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):

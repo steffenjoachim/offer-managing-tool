@@ -1,45 +1,78 @@
 from django.shortcuts import render
 from rest_framework import generics, status
 from rest_framework.response import Response
-from .models import Anzeige, AnzeigeBild
-from .serializers import AnzeigeSerializer, AnzeigeBildSerializer
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.pagination import PageNumberPagination
+from .models import Listing, ListingImage
+from .serializers import ListingSerializer, ListingImageSerializer
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, AllowAny
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Create your views here.
 
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
 class ListingListCreateView(generics.ListCreateAPIView):
-    queryset = Anzeige.objects.all()
-    serializer_class = AnzeigeSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    queryset = Listing.objects.all().order_by('-created_at')
+    serializer_class = ListingSerializer
+    permission_classes = [AllowAny]
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        user_id = self.request.query_params.get('user_id')
-        if user_id:
-            queryset = queryset.filter(user__id=user_id)
-        return queryset
+        try:
+            queryset = super().get_queryset()
+            if self.request.path.endswith('my/'):
+                queryset = queryset.filter(user=self.request.user)
+            return queryset
+        except Exception as e:
+            logger.error(f"Error in get_queryset: {str(e)}")
+            raise
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            page = self.paginate_queryset(queryset)
+            
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Error in list view: {str(e)}")
+            return Response(
+                {'detail': f'Error retrieving listings: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        self.perform_create(serializer)
-        anzeige_instance = serializer.instance
-        
-        bilder_data = request.FILES.getlist('bilder')
-        if bilder_data:
-            for bild_file in bilder_data:
-                AnzeigeBild.objects.create(anzeige=anzeige_instance, bild=bild_file)
-
-        response_serializer = self.get_serializer(anzeige_instance)
-        
-        headers = self.get_success_headers(response_serializer.data)
-        return Response(response_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            
+            self.perform_create(serializer)
+            listing_instance = serializer.instance
+            
+            response_serializer = self.get_serializer(listing_instance)
+            
+            headers = self.get_success_headers(response_serializer.data)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        except Exception as e:
+            logger.error(f"Error in create view: {str(e)}")
+            return Response(
+                {'detail': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 class ListingDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Anzeige.objects.all()
-    serializer_class = AnzeigeSerializer
+    queryset = Listing.objects.all()
+    serializer_class = ListingSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]

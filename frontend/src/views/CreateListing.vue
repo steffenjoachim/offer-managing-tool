@@ -41,9 +41,10 @@
         <el-form-item label="Category" prop="category">
           <el-select v-model="form.category" placeholder="Select category">
             <el-option label="Electronics" value="electronics" />
-            <el-option label="Furniture" value="furniture" />
-            <el-option label="Clothing" value="clothing" />
-            <el-option label="Books" value="books" />
+            <el-option label="Fashion" value="fashion" />
+            <el-option label="Home & Garden" value="home" />
+            <el-option label="Sports & Leisure" value="sports" />
+            <el-option label="Toys & Games" value="toys" />
             <el-option label="Other" value="other" />
           </el-select>
         </el-form-item>
@@ -77,6 +78,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { Plus } from "@element-plus/icons-vue";
+import axios from "axios";
 
 export default {
   name: "CreateListing",
@@ -140,18 +142,27 @@ export default {
         loading.value = true;
 
         const formData = new FormData();
-        formData.append("titel", form.title);
-        formData.append("beschreibung", form.description);
-        formData.append("preis", form.price);
-        formData.append("kategorie", form.category);
-        formData.append("erstellungsdatum", form.createdAt);
+        formData.append("title", form.title);
+        formData.append("description", form.description);
+        formData.append("price", form.price);
+        formData.append("category", form.category);
+        formData.append("createdAt", form.createdAt);
         form.images.forEach((file) => {
-          formData.append("bilder", file);
+          formData.append("images", file);
         });
 
-        await store.dispatch("listings/createListing", formData);
+        const response = await axios.post(
+          "http://localhost:8000/api/listings/",
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+
         ElMessage.success("Listing created successfully!");
-        router.push("/");
+        router.push("/my-listings");
       } catch (error) {
         console.error("Error creating listing:", error);
         ElMessage.error(

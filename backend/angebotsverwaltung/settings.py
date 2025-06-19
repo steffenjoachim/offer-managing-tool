@@ -35,7 +35,7 @@ INSTALLED_APPS = [
     "ads",
     'users',
     'kleinanzeigen',
-    'messaging.apps.MessagingConfig', # Neue messaging App
+    'messaging.apps.MessagingConfig',
     'watchlist.apps.WatchlistConfig',
 ]
 

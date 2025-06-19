@@ -8,7 +8,7 @@
         <div class="image-section">
           <img
             v-if="listing.images && listing.images.length > 0"
-            :src="listing.images[0].bild"
+            :src="listing.images[0].image"
             alt="Main Listing Image"
             class="main-detail-image"
           />
@@ -27,48 +27,9 @@
           </div>
 
           <p class="listing-description">
-            Description: {{ listing.description }}
+            <span class="desc-label">Description:</span>
+            {{ listing.description }}
           </p>
-
-          <!-- Additional Images Container -->
-          <div
-            class="additional-images-container"
-            v-if="listing.images && listing.images.length > 1"
-          >
-            <!-- Wrapper for overflow hidden -->
-            <div class="additional-images-wrapper">
-              <div class="additional-images-list" ref="additionalImagesList">
-                <div
-                  v-for="(image, index) in listing.images.slice(1)"
-                  :key="index"
-                  class="thumbnail-container"
-                >
-                  <img
-                    :src="image.bild"
-                    alt="Listing Thumbnail"
-                    class="thumbnail-image"
-                  />
-                </div>
-              </div>
-            </div>
-            <!-- Navigation Arrows -->
-            <div class="image-navigation">
-              <div
-                class="image-nav-arrow left"
-                v-if="showLeftArrow"
-                @click="scrollAdditionalImages('left')"
-              >
-                ❮
-              </div>
-              <div
-                class="image-nav-arrow right"
-                v-if="showRightArrow"
-                @click="scrollAdditionalImages('right')"
-              >
-                ❯
-              </div>
-            </div>
-          </div>
 
           <div class="seller-info">
             <p>Seller: {{ listing.user ? listing.user.username : "N/A" }}</p>
@@ -82,6 +43,43 @@
               Created at:
               {{ formatDate(listing.createdAt) }}
             </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Additional Images Section -->
+      <div class="additional-images-section" v-if="additionalImages.length > 0">
+        <div class="additional-images-wrapper" ref="additionalImagesList">
+          <div class="additional-images-list">
+            <div
+              v-for="(image, index) in additionalImages"
+              :key="index"
+              class="thumbnail-container"
+            >
+              <img
+                :src="image.image"
+                alt="Listing Thumbnail"
+                class="thumbnail-image"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation Arrows BELOW images -->
+        <div class="image-navigation-controls">
+          <div
+            class="image-nav-arrow left"
+            v-if="showLeftArrow"
+            @click="scrollAdditionalImages('left')"
+          >
+            ❮
+          </div>
+          <div
+            class="image-nav-arrow right"
+            v-if="showRightArrow"
+            @click="scrollAdditionalImages('right')"
+          >
+            ❯
           </div>
         </div>
       </div>
@@ -108,7 +106,7 @@
 </template>
 
 <script>
-import { ref, onMounted, nextTick } from "vue";
+import { ref, onMounted, nextTick, computed } from "vue";
 import { useRoute } from "vue-router";
 import axios from "axios";
 import { ElButton, ElMessage } from "element-plus";
@@ -162,15 +160,15 @@ export default {
         );
         listing.value = {
           ...response.data,
-          createdAt: response.data.erstellungsdatum || null, // HIER WURDE ES KORRIGIERT
-          title: response.data.titel,
-          description: response.data.beschreibung,
-          price: response.data.preis,
-          category: response.data.kategorie,
-          images: response.data.bilder,
+          createdAt: response.data.created_at || null,
+          title: response.data.title,
+          description: response.data.description,
+          price: response.data.price,
+          category: response.data.category,
+          images: response.data.images,
         };
+        console.log("Fetched listing images:", listing.value.images); // Debug-Log
         nextTick(() => {
-          // Check if arrows are needed after images are rendered
           checkScrollArrowsNeeded();
         });
       } catch (error) {
@@ -179,62 +177,28 @@ export default {
       }
     };
 
-    // Helper function to format date
     const formatDate = (dateString) => {
       if (!dateString) return "N/A";
       const date = new Date(dateString);
       return isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString();
     };
 
-    // Function to check if scroll arrows are needed
     const checkScrollArrowsNeeded = () => {
-      if (
-        !additionalImagesList.value ||
-        !listing.value ||
-        !listing.value.images ||
-        listing.value.images.length <= 1
-      ) {
-        showLeftArrow.value = false;
-        showRightArrow.value = false;
-        return;
+      if (additionalImagesList.value) {
+        const { scrollWidth, clientWidth } = additionalImagesList.value;
+        showLeftArrow.value = additionalImagesList.value.scrollLeft > 0;
+        showRightArrow.value = scrollWidth > clientWidth;
       }
-
-      const list = additionalImagesList.value;
-      const scrollLeft = Math.round(list.scrollLeft);
-      const scrollWidth = Math.round(list.scrollWidth);
-      const clientWidth = Math.round(list.clientWidth);
-
-      // Left arrow display, if scrollLeft is greater than 0.
-      showLeftArrow.value = scrollLeft > 0;
-
-      // Right arrow display, if scrollLeft is less than the maximum scroll position.
-      const maxScrollLeft = scrollWidth - clientWidth;
-      showRightArrow.value = scrollLeft < maxScrollLeft;
     };
 
-    // Function to scroll the additional images list
     const scrollAdditionalImages = (direction) => {
+      const scrollAmount = 200; // Adjust as needed
       if (additionalImagesList.value) {
-        const list = additionalImagesList.value;
-        // Calculate scroll amount based on thumbnail width and margin
-        const thumbnailElement = list.querySelector(".thumbnail-container");
-        if (!thumbnailElement) return; // Should not happen if images are present
-
-        const thumbnailWidth = thumbnailElement.offsetWidth; // includes padding and border if any
-        const thumbnailMarginRight = parseInt(
-          window.getComputedStyle(thumbnailElement).marginRight,
-          10
-        );
-
-        const scrollAmount = thumbnailWidth + thumbnailMarginRight;
-
         if (direction === "left") {
-          list.scrollLeft -= scrollAmount;
-        } else if (direction === "right") {
-          list.scrollLeft += scrollAmount;
+          additionalImagesList.value.scrollLeft -= scrollAmount;
+        } else {
+          additionalImagesList.value.scrollLeft += scrollAmount;
         }
-
-        // After scrolling, recheck arrow visibility
         nextTick(() => {
           checkScrollArrowsNeeded();
         });
@@ -246,18 +210,13 @@ export default {
     };
 
     const handleMessageSent = async (messageData) => {
-      if (!listingId) {
-        showError("No listing ID available");
-        return;
-      }
-
       try {
         await store.dispatch("messages/sendMessageToListing", {
           listingId: listingId,
           content: messageData.content,
         });
         showSuccess("Message sent successfully!");
-        showMessageForm.value = false; // Close form after sending
+        showMessageForm.value = false;
       } catch (error) {
         console.error("Error sending message:", error);
         showError("Failed to send message.");
@@ -278,6 +237,17 @@ export default {
       }
     };
 
+    const additionalImages = computed(() => {
+      if (
+        listing.value &&
+        Array.isArray(listing.value.images) &&
+        listing.value.images.length > 1
+      ) {
+        return listing.value.images.slice(1);
+      }
+      return [];
+    });
+
     onMounted(() => {
       fetchListing();
     });
@@ -293,6 +263,7 @@ export default {
       toggleMessageForm,
       handleMessageSent,
       addToWatchlist,
+      additionalImages,
     };
   },
 };
@@ -362,15 +333,42 @@ export default {
   font-size: 1.1em;
   color: #555;
   line-height: 1.6;
-  white-space: pre-wrap; /* Preserves whitespace and line breaks */
+  white-space: pre-line;
+  margin: 0;
 }
 
-.additional-images-container {
-  position: relative;
+.desc-label {
+  display: inline-block;
+  min-width: 100px;
+  font-weight: 500;
+  color: #222;
+}
+
+.seller-info {
+  margin-top: 20px;
+  border-top: 1px solid #eee;
+  padding-top: 15px;
+  font-size: 0.95em;
+  color: #666;
+}
+
+.seller-info p {
+  margin-bottom: 5px;
+}
+
+.member-since-info {
+  font-size: 0.85em; /* Slightly smaller than seller info */
+  margin-top: -3px; /* Move closer to seller info */
+  margin-bottom: 8px; /* Maintain some spacing to next element */
+  color: #777;
+}
+
+.additional-images-section {
   width: 100%;
   margin-top: 20px;
-  overflow: hidden; /* Hide scrollbar but allow scrolling */
-  padding: 10px 0; /* Padding for arrows */
+  display: flex;
+  flex-direction: column; /* Stack image wrapper and controls vertically */
+  align-items: center; /* Center the image wrapper and controls */
 }
 
 .additional-images-wrapper {
@@ -378,6 +376,7 @@ export default {
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
   scrollbar-width: none; /* Hide scrollbar for Firefox */
   -ms-overflow-style: none; /* Hide scrollbar for IE/Edge */
+  width: 100%; /* Ensure it takes full width for scrolling */
 }
 
 .additional-images-wrapper::-webkit-scrollbar {
@@ -386,8 +385,9 @@ export default {
 
 .additional-images-list {
   display: flex;
+  flex-wrap: nowrap; /* CRUCIAL: Prevent wrapping to enable horizontal scrolling */
   gap: 15px;
-  padding: 5px;
+  padding: 5px; /* Keep padding for aesthetic around thumbnails */
   scroll-behavior: smooth; /* Smooth scroll on arrow click */
 }
 
@@ -412,14 +412,12 @@ export default {
   object-fit: cover;
 }
 
-.image-navigation {
-  position: absolute;
-  top: 50%;
-  width: 100%;
+.image-navigation-controls {
   display: flex;
-  justify-content: space-between;
-  transform: translateY(-50%);
-  pointer-events: none; /* Allow clicks to pass through */
+  justify-content: center; /* Center arrows below images */
+  gap: 30px; /* Space between left and right arrows */
+  margin-top: 15px; /* Space between images and arrows */
+  width: 100%; /* Take full width to allow centering */
 }
 
 .image-nav-arrow {
@@ -429,40 +427,9 @@ export default {
   border-radius: 50%;
   cursor: pointer;
   font-size: 1.5em;
-  z-index: 10;
-  pointer-events: all; /* Re-enable clicks for arrows */
+  z-index: 10; /* Ensure arrows are above other content if overlapping */
   transition: background-color 0.2s ease;
-}
-
-.image-nav-arrow:hover {
-  background-color: rgba(0, 0, 0, 0.7);
-}
-
-.image-nav-arrow.left {
-  margin-left: -15px; /* Adjust positioning */
-}
-
-.image-nav-arrow.right {
-  margin-right: -15px; /* Adjust positioning */
-}
-
-.seller-info {
-  margin-top: 20px;
-  border-top: 1px solid #eee;
-  padding-top: 15px;
-  font-size: 0.95em;
-  color: #666;
-}
-
-.seller-info p {
-  margin-bottom: 5px;
-}
-
-.member-since-info {
-  font-size: 0.85em; /* Slightly smaller than seller info */
-  margin-top: -3px; /* Move closer to seller info */
-  margin-bottom: 8px; /* Maintain some spacing to next element */
-  color: #777;
+  position: static; /* Reset from previous absolute positioning */
 }
 
 .message-section {

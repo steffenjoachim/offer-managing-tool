@@ -1,14 +1,16 @@
 from django.contrib import admin
-from .models import Anzeige, AnzeigeBild
+from .models import Listing, ListingImage
 
-class AnzeigeBildInline(admin.TabularInline):
-    model = AnzeigeBild
+class ListingImageInline(admin.TabularInline):
+    model = ListingImage
     extra = 1
 
-@admin.register(Anzeige)
-class AnzeigeAdmin(admin.ModelAdmin):
-    list_display = ('titel', 'user', 'preis', 'erstellungsdatum', 'status')
-    list_filter = ('status', 'kategorie')
-    search_fields = ('titel', 'beschreibung', 'user__username')
-    date_hierarchy = 'erstellungsdatum'
-    inlines = [AnzeigeBildInline]
+class ListingAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'price', 'created_at', 'category', 'is_active')
+    list_filter = ('category', 'is_active')
+    search_fields = ('title', 'description', 'user__username')
+    date_hierarchy = 'created_at'
+    inlines = [ListingImageInline]
+
+admin.site.register(Listing, ListingAdmin)
+admin.site.register(ListingImage)
