@@ -101,20 +101,22 @@ export default {
     const fetchWatchlist = async () => {
       try {
         const response = await axios.get(
-          "http://localhost:8000/api/watchlist/"
+          "http://localhost:8000/api/watchlist/items/"
         );
-        watchlist.value = response.data.map((listing) => ({
-          ...listing,
-          createdAt: listing.created_at || null,
-          title: listing.title,
-          description: listing.description,
-          price: listing.price,
-          category: listing.category,
-          images: listing.images,
+        watchlist.value = response.data.map((item) => ({
+          ...item.listing,
+          id: item.listing.id,
+          title: item.listing.title,
+          description: item.listing.description,
+          price: item.listing.price,
+          category: item.listing.category,
+          images: item.listing.images,
         }));
       } catch (error) {
         console.error("Error fetching watchlist:", error);
         showError("Failed to load your watchlist.");
+      } finally {
+        loading.value = false;
       }
     };
 
@@ -135,6 +137,18 @@ export default {
 
     const navigateToHome = () => {
       router.push("/");
+    };
+
+    const showError = (message) => {
+      try {
+        ElMessage({
+          message: message,
+          type: "error",
+          duration: 3000,
+        });
+      } catch (e) {
+        console.error("Error showing message:", e);
+      }
     };
 
     onMounted(() => {

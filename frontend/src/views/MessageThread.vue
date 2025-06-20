@@ -35,18 +35,20 @@
         >
           <div class="message-content">
             <p class="message-sender">{{ message.sender.username }}</p>
-            <p class="message-text" v-if="message.text">{{ message.text }}</p>
+            <p class="message-text" v-if="message.content">
+              {{ message.content }}
+            </p>
             <div v-if="message.file" class="message-file">
               <img
                 v-if="isImage(message.file)"
-                :src="message.file"
+                :src="getFileUrl(message.file)"
                 alt="Attached Image"
                 class="attached-image"
                 @click="showImage(message.file)"
               />
               <a
                 v-else
-                :href="message.file"
+                :href="getFileUrl(message.file)"
                 target="_blank"
                 class="attached-file-link"
               >
@@ -54,7 +56,7 @@
               </a>
             </div>
             <span class="message-timestamp">{{
-              new Date(message.timestamp).toLocaleString()
+              formatDate(message.created_at)
             }}</span>
           </div>
         </div>
@@ -164,7 +166,7 @@ export default {
 
       const messageData = new FormData();
       if (newMessageContent.value.trim()) {
-        messageData.append("text", newMessageContent.value.trim());
+        messageData.append("content", newMessageContent.value.trim());
       }
       if (selectedFile.value) {
         messageData.append("file", selectedFile.value);
@@ -229,6 +231,25 @@ export default {
       }
     };
 
+    const getFileUrl = (file) => {
+      if (!file) return "";
+      if (file.startsWith("http")) return file;
+      // Passe ggf. die URL an, falls nur ein relativer Pfad geliefert wird
+      return `http://localhost:8000${file}`;
+    };
+
+    // Format date for display
+    const formatDate = (dateString) => {
+      if (!dateString) return "";
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      return `${day}.${month}.${year} – ${hours}:${minutes} Uhr`;
+    };
+
     // Initial fetch and scroll
     onMounted(() => {
       fetchCurrentConversation();
@@ -266,6 +287,8 @@ export default {
       getFileName,
       showImage,
       closeImageViewer,
+      formatDate,
+      getFileUrl,
     };
   },
 };

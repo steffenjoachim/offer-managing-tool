@@ -48,29 +48,35 @@
                   {{ conversation.listing ? conversation.listing.title : "" }}
                 </div>
                 <div class="sender-info">
-                  {{ conversationDisplayTextsLocal[index] }}
+                  {{ calculatedConversationDisplayTexts[index] }}
+                </div>
+                <div class="message-row" v-if="conversation.last_message">
+                  <span
+                    class="last-message"
+                    :class="{ 'is-unread': conversation.unreadCount > 0 }"
+                  >
+                    {{
+                      conversation.last_message.content
+                        ? conversation.last_message.content
+                        : conversation.last_message.file
+                        ? "[File attached]"
+                        : "No message"
+                    }}
+                  </span>
+                  <span class="timestamp-inline">
+                    {{
+                      conversation.last_message.created_at
+                        ? formatDate(conversation.last_message.created_at)
+                        : "-"
+                    }}
+                  </span>
                 </div>
               </div>
               <div class="header-right">
-                <span class="timestamp">
-                  {{ formatDate(conversation.last_message?.timestamp || null) }}
-                </span>
+                <!-- Entfernt: Timestamp hier, wird jetzt unten angezeigt -->
               </div>
             </div>
             <div class="last-message-box">
-              <div
-                class="last-message"
-                :class="{ 'is-unread': conversation.unreadCount > 0 }"
-              >
-                {{
-                  conversation.last_message
-                    ? conversation.last_message.text ||
-                      (conversation.last_message.file
-                        ? "[Datei angehängt]"
-                        : "")
-                    : ""
-                }}
-              </div>
               <span
                 v-if="conversation.unreadCount === 0"
                 class="delete-x"
@@ -137,12 +143,8 @@ export default {
       return user;
     });
 
-    // New reactive variable to hold display texts
-    const conversationDisplayTextsLocal = ref([]);
-
-    // New computed property to calculate display texts based on conversations and currentUser
+    // computed statt ref für Display-Texts
     const calculatedConversationDisplayTexts = computed(() => {
-      // Check if both conversations and user are available before calculating display texts
       if (
         conversations.value &&
         conversations.value.length > 0 &&
@@ -164,29 +166,23 @@ export default {
           }
 
           if (senderId === currentUserId) {
+            // Empfänger ist recipient
             const recipientUsername =
-              conversation.last_message.empfaenger?.username ||
-              "Empfänger unbekannt";
+              conversation.last_message.recipient?.username ||
+              "Recipient unknown";
             return `to: ${recipientUsername}`;
           } else {
             const senderUsername =
-              conversation.last_message.sender?.username || "Sender unbekannt";
+              conversation.last_message.sender?.username || "Sender unknown";
             return `sender: ${senderUsername}`;
           }
         });
       } else {
-        // Return an empty array or null when conditions are not met
-        return []; // Or null, depending on how you want to handle the intermediate state
+        return [];
       }
     });
 
-    // Watch conversations and currentUser indirectly by watching calculatedConversationDisplayTexts
-    watch(calculatedConversationDisplayTexts, (newDisplayTexts) => {
-      // Update the local reactive variable with the calculated texts
-      conversationDisplayTextsLocal.value = newDisplayTexts;
-    });
-
-    // Watch for authentication status and user data to trigger conversation fetch
+    // Watch für Auth und User bleibt wie gehabt
     watch(
       [isAuthReady, currentUser],
       ([newIsAuthReady, newCurrentUser]) => {
@@ -199,31 +195,24 @@ export default {
           console.log(
             "MessagesView: Auth ready but user NOT logged in, clearing conversations."
           );
-          // Auth is ready but no user is logged in, clear conversations
           store.commit("messages/SET_CONVERSATIONS", []);
         } else {
           console.log("MessagesView: Auth NOT ready yet.");
-          // Auth is not ready yet, keep current state (e.g., loading spinner)
         }
       },
-      { immediate: true } // Run immediately on component mount
+      { immediate: true }
     );
 
     const currentDisplayState = computed(() => {
-      // 1. Priority: Loading State
-      // Show loading if the message store is loading OR if auth is not ready yet
       if (loading.value || !isAuthReady.value) {
         return "loading";
       }
-      // 2. Priority: Error State
       if (error.value) {
         return "error";
       }
-      // 3. Priority: No Messages State
       if (conversations.value.length === 0) {
         return "no-messages";
       }
-      // 4. Default: List State
       return "list";
     });
 
@@ -264,11 +253,16 @@ export default {
     const formatDate = (dateString) => {
       if (!dateString) return "";
       const date = new Date(dateString);
-      return date.toLocaleDateString() + " " + date.toLocaleTimeString();
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      return `${day}.${month}.${year} – ${hours}:${minutes} Uhr`;
     };
 
     const navigateToCommunity = () => {
-      router.push("/"); // Adjust as per your community route
+      router.push("/");
     };
 
     return {
@@ -283,7 +277,7 @@ export default {
       deleteConversation,
       formatDate,
       navigateToCommunity,
-      conversationDisplayTextsLocal,
+      calculatedConversationDisplayTexts,
       currentUser,
     };
   },
@@ -373,9 +367,31 @@ export default {
   align-items: flex-end;
 }
 
-.timestamp {
+.message-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 2px;
+}
+
+.last-message {
+  font-size: 15px;
+  color: #333;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: initial;
+  word-break: break-word;
+  font-weight: normal;
+}
+
+.last-message.is-unread {
+  font-weight: bold;
+}
+
+.timestamp-inline {
   font-size: 12px;
   color: #999;
+  margin-left: 8px;
   white-space: nowrap;
 }
 
@@ -383,19 +399,6 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.last-message {
-  flex-grow: 1;
-  font-size: 14px;
-  color: #555;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.last-message.is-unread {
-  font-weight: bold;
 }
 
 .delete-x {
