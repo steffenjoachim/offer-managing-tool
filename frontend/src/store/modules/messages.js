@@ -126,14 +126,14 @@ const actions = {
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
       const response = await axios.post(
-        "http://localhost:8000/api/messages/messages/send_message_to_listing/",
+        "http://localhost:8000/api/messages/send_message_to_listing/",
         {
-          listingId: listingId,
+          listing_id: listingId,
           content: content,
         },
         {
           headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Type": "application/json",
           },
         }
       );

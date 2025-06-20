@@ -11,7 +11,7 @@ export default {
   name: "MessageForm",
   props: {
     recipient: {
-      type: String,
+      type: Object,
       required: true,
     },
   },
