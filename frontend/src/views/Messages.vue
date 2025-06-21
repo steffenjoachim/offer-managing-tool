@@ -49,6 +49,11 @@
                 </div>
                 <div class="sender-info">
                   {{ calculatedConversationDisplayTexts[index] }}
+                  <sup
+                    v-if="conversation.unreadCount > 0"
+                    class="unread-badge"
+                    >{{ conversation.unreadCount }}</sup
+                  >
                 </div>
                 <div class="message-row" v-if="conversation.last_message">
                   <span
@@ -419,5 +424,37 @@ export default {
 
 .delete-x-inner {
   display: block;
+}
+
+.unread-badge {
+  display: inline-block;
+  background: #ff4d4f;
+  color: #fff;
+  border-radius: 50%;
+  min-width: 20px;
+  height: 20px;
+  line-height: 20px;
+  font-size: 12px;
+  font-weight: bold;
+  text-align: center;
+  margin-left: 6px;
+  vertical-align: super;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.unread-badge {
+  display: inline-block;
+  background: #ff4d4f;
+  color: #fff;
+  border-radius: 50%;
+  min-width: 20px;
+  height: 20px;
+  line-height: 20px;
+  font-size: 12px;
+  font-weight: bold;
+  text-align: center;
+  margin-left: 6px;
+  vertical-align: super;
+  box-shadow: 0 0 0 2px #fff;
 }
 </style>
