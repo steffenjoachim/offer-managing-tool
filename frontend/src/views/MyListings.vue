@@ -17,17 +17,23 @@
       </div>
 
       <div v-else class="my-listings-content">
-        <div v-if="listings && listings.length === 0" class="no-listings">
+        <div
+          v-if="validListings && validListings.length === 0"
+          class="no-listings"
+        >
           <el-empty description="You haven't created any listings yet." />
           <el-button type="primary" @click="navigateToCreateListing">
             Create a new listing
           </el-button>
         </div>
 
-        <div v-else-if="listings && listings.length > 0" class="listings-grid">
+        <div
+          v-else-if="validListings && validListings.length > 0"
+          class="listings-grid"
+        >
           <el-row :gutter="20">
             <el-col
-              v-for="listing in listings"
+              v-for="listing in validListings"
               :key="listing.id"
               :xs="24"
               :sm="12"
@@ -84,7 +90,7 @@
 </template>
 
 <script>
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import axios from "axios";
@@ -187,6 +193,23 @@ export default {
       }
     };
 
+    // Hilfsfunktion: true, wenn Anzeige noch gültig
+    const isListingValid = (createdAtString) => {
+      if (!createdAtString) return false;
+      const createdDate = new Date(createdAtString);
+      const now = new Date();
+      createdDate.setHours(0, 0, 0, 0);
+      now.setHours(0, 0, 0, 0);
+      const expirationDate = new Date(createdDate);
+      expirationDate.setDate(createdDate.getDate() + VALIDITY_DAYS);
+      return expirationDate.getTime() >= now.getTime();
+    };
+
+    // Gefilterte Liste für das Template
+    const validListings = computed(() =>
+      listings.value.filter((listing) => isListingValid(listing.created_at))
+    );
+
     // Watch for changes in the authenticated user object
     watch(
       () => store.getters["auth/currentUser"],
@@ -237,7 +260,7 @@ export default {
     return {
       loading,
       error,
-      listings,
+      validListings,
       viewListing,
       deleteListing,
       navigateToCreateListing,

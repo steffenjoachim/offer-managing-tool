@@ -36,63 +36,76 @@
       >
         <el-scrollbar height="calc(100vh - 200px)">
           <div
-            v-for="(conversation, index) in conversations"
-            :key="conversation.id"
-            class="conversation-item"
-            :class="{ unread: conversation.unreadCount > 0 }"
-            @click="openConversation(conversation.id)"
+            v-for="group in groupedConversations"
+            :key="group.listing.id"
+            class="conversation-group"
           >
-            <div class="conversation-header">
-              <div class="conversation-info-block">
-                <div class="listing-title">
-                  {{ conversation.listing ? conversation.listing.title : "" }}
-                </div>
-                <div class="sender-info">
-                  {{ calculatedConversationDisplayTexts[index] }}
-                  <sup
-                    v-if="conversation.unreadCount > 0"
-                    class="unread-badge"
-                    >{{ conversation.unreadCount }}</sup
-                  >
-                </div>
-                <div class="message-row" v-if="conversation.last_message">
-                  <span
-                    class="last-message"
-                    :class="{ 'is-unread': conversation.unreadCount > 0 }"
-                  >
-                    {{
-                      conversation.last_message.content
-                        ? conversation.last_message.content
-                        : conversation.last_message.file
-                        ? "[File attached]"
-                        : "No message"
-                    }}
-                  </span>
-                  <span class="timestamp-inline">
-                    {{
-                      conversation.last_message.created_at
-                        ? formatDate(conversation.last_message.created_at)
-                        : "-"
-                    }}
-                  </span>
-                </div>
-              </div>
-              <div class="header-right">
-                <!-- Entfernt: Timestamp hier, wird jetzt unten angezeigt -->
-              </div>
+            <div
+              class="listing-title"
+              style="font-size: 18px; font-weight: bold; margin-bottom: 8px"
+            >
+              {{ group.listing.title }}
             </div>
-            <div class="last-message-box">
-              <span
-                v-if="conversation.unreadCount === 0"
-                class="delete-x"
-                @click.stop="confirmDelete(conversation.id)"
-                title="Delete conversation"
-                tabindex="0"
-                role="button"
-                aria-label="Delete conversation"
-              >
-                <span class="delete-x-inner">×</span>
-              </span>
+            <div
+              v-for="conversation in group.conversations"
+              :key="conversation.id"
+              class="conversation-item"
+              :class="{ unread: conversation.unreadCount > 0 }"
+              @click="openConversation(conversation.id)"
+            >
+              <div class="conversation-header">
+                <div class="conversation-info-block">
+                  <div class="sender-info">
+                    <span v-if="conversation.last_message">
+                      {{
+                        conversation.last_message.sender?.username
+                          ? `sender: ${conversation.last_message.sender.username}`
+                          : ""
+                      }}
+                    </span>
+                    <sup
+                      v-if="conversation.unreadCount > 0"
+                      class="unread-badge"
+                      >{{ conversation.unreadCount }}</sup
+                    >
+                  </div>
+                  <div class="message-row" v-if="conversation.last_message">
+                    <span
+                      class="last-message"
+                      :class="{ 'is-unread': conversation.unreadCount > 0 }"
+                    >
+                      {{
+                        conversation.last_message.content
+                          ? conversation.last_message.content
+                          : conversation.last_message.file
+                          ? "[File attached]"
+                          : "No message"
+                      }}
+                    </span>
+                    <span class="timestamp-inline">
+                      {{
+                        conversation.last_message.created_at
+                          ? formatDate(conversation.last_message.created_at)
+                          : "-"
+                      }}
+                    </span>
+                  </div>
+                </div>
+                <div class="header-right"></div>
+              </div>
+              <div class="last-message-box">
+                <span
+                  v-if="conversation.unreadCount === 0"
+                  class="delete-x"
+                  @click.stop="confirmDelete(conversation.id)"
+                  title="Delete conversation"
+                  tabindex="0"
+                  role="button"
+                  aria-label="Delete conversation"
+                >
+                  <span class="delete-x-inner">×</span>
+                </span>
+              </div>
             </div>
           </div>
         </el-scrollbar>
@@ -135,12 +148,22 @@ export default {
     const isLoggedIn = computed(() => store.getters["auth/isLoggedIn"]);
     const isAuthReady = computed(() => store.getters["auth/isAuthReady"]);
 
-    const conversations = computed(() => {
-      // Ensure conversations is always an array
+    // Gruppiere Konversationen nach listing.id
+    const groupedConversations = computed(() => {
       const allConversations = store.getters["messages/allConversations"] || [];
-      return allConversations.filter(
-        (conversation) => conversation.last_message
-      );
+      const groups = {};
+      allConversations.forEach((conv) => {
+        const listingId = conv.listing?.id;
+        if (!listingId) return;
+        if (!groups[listingId]) {
+          groups[listingId] = {
+            listing: conv.listing,
+            conversations: [],
+          };
+        }
+        groups[listingId].conversations.push(conv);
+      });
+      return Object.values(groups);
     });
 
     const currentUser = computed(() => {
@@ -151,21 +174,24 @@ export default {
     // computed statt ref für Display-Texts
     const calculatedConversationDisplayTexts = computed(() => {
       if (
-        conversations.value &&
-        conversations.value.length > 0 &&
+        groupedConversations.value &&
+        groupedConversations.value.length > 0 &&
         currentUser.value
       ) {
         const currentUserId = currentUser.value.id;
-        return conversations.value.map((conversation) => {
-          if (!conversation.last_message) {
+        return groupedConversations.value.map((group) => {
+          if (!group.conversations || group.conversations.length === 0) {
             return "";
           }
 
-          const senderId = Number(conversation.last_message.sender?.id);
+          const senderId = Number(
+            group.conversations[0].last_message.sender?.id
+          );
 
           if (
             isNaN(senderId) ||
-            typeof conversation.last_message.sender?.id === "undefined"
+            typeof group.conversations[0].last_message.sender?.id ===
+              "undefined"
           ) {
             return "";
           }
@@ -173,12 +199,13 @@ export default {
           if (senderId === currentUserId) {
             // Empfänger ist recipient
             const recipientUsername =
-              conversation.last_message.recipient?.username ||
+              group.conversations[0].last_message.recipient?.username ||
               "Recipient unknown";
             return `to: ${recipientUsername}`;
           } else {
             const senderUsername =
-              conversation.last_message.sender?.username || "Sender unknown";
+              group.conversations[0].last_message.sender?.username ||
+              "Sender unknown";
             return `sender: ${senderUsername}`;
           }
         });
@@ -215,7 +242,7 @@ export default {
       if (error.value) {
         return "error";
       }
-      if (conversations.value.length === 0) {
+      if (groupedConversations.value.length === 0) {
         return "no-messages";
       }
       return "list";
@@ -274,7 +301,7 @@ export default {
       currentDisplayState,
       loading,
       error,
-      conversations,
+      groupedConversations,
       openConversation,
       deleteDialogVisible,
       confirmDelete,
