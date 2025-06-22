@@ -91,6 +91,9 @@
             >Send Message</el-button
           >
           <el-button @click="addToWatchlist">Add to Watchlist</el-button>
+          <el-button v-if="isOwner" type="warning" @click="editListing"
+            >Edit</el-button
+          >
         </div>
         <MessageForm
           v-if="showMessageForm"
@@ -107,7 +110,7 @@
 
 <script>
 import { ref, onMounted, nextTick, computed } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import axios from "axios";
 import { ElButton, ElMessage } from "element-plus";
 import MessageForm from "@/components/MessageForm.vue";
@@ -122,12 +125,25 @@ export default {
   setup() {
     const listing = ref(null);
     const route = useRoute();
+    const router = useRouter();
     const listingId = route.params.id;
     const additionalImagesList = ref(null);
     const showLeftArrow = ref(false);
     const showRightArrow = ref(false);
     const showMessageForm = ref(false);
     const store = useStore();
+
+    // Aktueller User aus dem Store
+    const currentUser = computed(() => store.getters["auth/currentUser"]);
+    // Ist der eingeloggte User der Besitzer?
+    const isOwner = computed(() => {
+      return (
+        listing.value &&
+        listing.value.user &&
+        currentUser.value &&
+        listing.value.user.id === currentUser.value.id
+      );
+    });
 
     const showError = (message) => {
       try {
@@ -248,6 +264,11 @@ export default {
       return [];
     });
 
+    // Edit-Button Funktion
+    const editListing = () => {
+      router.push(`/edit-listing/${listingId}`);
+    };
+
     onMounted(() => {
       fetchListing();
     });
@@ -264,6 +285,8 @@ export default {
       handleMessageSent,
       addToWatchlist,
       additionalImages,
+      isOwner,
+      editListing,
     };
   },
 };
