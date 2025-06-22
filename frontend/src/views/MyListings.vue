@@ -78,6 +78,13 @@
                     >
                       Delete
                     </el-button>
+                    <el-button
+                      type="warning"
+                      size="small"
+                      @click="editListing(listing.id)"
+                    >
+                      Edit
+                    </el-button>
                   </div>
                 </div>
               </el-card>
@@ -253,6 +260,10 @@ export default {
       }
     };
 
+    const editListing = (id) => {
+      router.push(`/edit-listing/${id}`);
+    };
+
     const navigateToCreateListing = () => {
       router.push("/create-listing");
     };
@@ -263,6 +274,7 @@ export default {
       validListings,
       viewListing,
       deleteListing,
+      editListing,
       navigateToCreateListing,
       formatDate,
       getValidityStatus,

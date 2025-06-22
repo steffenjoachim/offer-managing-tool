@@ -4,6 +4,7 @@ import Login from "../views/Login.vue";
 import Register from "../views/Register.vue";
 import CreateListing from "../views/CreateListing.vue";
 import Messages from "../views/Messages.vue";
+import EditListing from "../views/EditListing.vue";
 import store from "../store";
 
 const routes = [
@@ -68,6 +69,13 @@ const routes = [
         /* webpackChunkName: "listing-detail" */ "../views/ListingDetail.vue"
       ),
     props: true,
+  },
+  {
+    path: "/edit-listing/:id",
+    name: "EditListing",
+    component: EditListing,
+    props: true,
+    meta: { requiresAuth: true },
   },
   {
     path: "/about",
