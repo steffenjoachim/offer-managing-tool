@@ -24,7 +24,7 @@
         <div v-else class="watchlist-items">
           <el-row :gutter="20">
             <el-col
-              v-for="item in watchlist"
+              v-for="item in filteredWatchlist"
               :key="item.id"
               :xs="24"
               :sm="12"
@@ -79,7 +79,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { Star } from "@element-plus/icons-vue";
@@ -97,6 +97,13 @@ export default {
     const loading = ref(true);
     const error = ref(null);
     const watchlist = ref([]);
+
+    // Filter für nicht abgelaufene Anzeigen
+    const filteredWatchlist = computed(() =>
+      watchlist.value.filter(
+        (item) => item.is_expired === false || item.is_expired === undefined
+      )
+    );
 
     const fetchWatchlist = async () => {
       try {
@@ -159,6 +166,7 @@ export default {
       loading,
       error,
       watchlist,
+      filteredWatchlist,
       viewListing,
       removeFromWatchlist,
       navigateToHome,

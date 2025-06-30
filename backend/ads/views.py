@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from .models import Listing, ListingImage
 from .serializers import ListingSerializer, ListingImageSerializer
-from rest_framework.permissions import IsAuthenticatedOrReadOnly, AllowAny
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, AllowAny, BasePermission, SAFE_METHODS
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,6 +15,17 @@ class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10
     page_size_query_param = 'page_size'
     max_page_size = 100
+
+class IsOwnerOrReadOnly(BasePermission):
+    """
+    Erlaubt Bearbeiten/Löschen nur für den Besitzer, Lesen für alle.
+    """
+    def has_object_permission(self, request, view, obj):
+        # Lesen ist für alle erlaubt
+        if request.method in SAFE_METHODS:
+            return True
+        # Schreiben/Bearbeiten/Löschen nur für den Besitzer
+        return obj.user == request.user
 
 class ListingListCreateView(generics.ListCreateAPIView):
     queryset = Listing.objects.all().order_by('-created_at')
@@ -75,4 +86,4 @@ class ListingListCreateView(generics.ListCreateAPIView):
 class ListingDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Listing.objects.all()
     serializer_class = ListingSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsOwnerOrReadOnly | IsAuthenticatedOrReadOnly]

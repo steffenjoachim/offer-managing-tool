@@ -11,5 +11,5 @@ urlpatterns = [
         'post': 'create',
         'get': 'list'
     }), name='conversation-messages'),
-    path('messages/send_message_to_listing/', views.MessageViewSet.as_view({'post': 'send_message'}), name='send-message-to-listing'),
+    path('send_message_to_listing/', views.MessageViewSet.as_view({'post': 'send_message'}), name='send-message-to-listing'),
 ] 

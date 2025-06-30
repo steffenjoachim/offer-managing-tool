@@ -8,7 +8,7 @@ from .models import Message, Conversation
 from ads.models import Listing
 from .serializers import MessageSerializer, MessageCreateSerializer, ConversationSerializer
 from django.contrib.auth import get_user_model
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 User = get_user_model()
 
@@ -63,7 +63,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
         # und noch nicht gelesen sind, als gelesen.
         messages_to_mark = conversation.messages.filter(
             is_read=False,
-            empfaenger=request.user # Nur Nachrichten markieren, wo der aktuelle Benutzer der Empfänger ist
+            recipient=request.user # Nur Nachrichten markieren, wo der aktuelle Benutzer der Empfänger ist
         )
         count_updated = messages_to_mark.update(is_read=True)
         
@@ -73,7 +73,7 @@ class MessageViewSet(viewsets.ModelViewSet):
     # serializer_class wird dynamisch in get_serializer_class bestimmt
     queryset = Message.objects.all()
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -87,8 +87,8 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         # Manually construct data that the serializer should process
         data_for_serializer = {}
-        if 'text' in request.data:
-            data_for_serializer['text'] = request.data['text']
+        if 'content' in request.data:
+            data_for_serializer['content'] = request.data['content']
         if 'file' in request.data:
             data_for_serializer['file'] = request.data['file']
         
@@ -117,7 +117,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         anzeige = conversation.listing if conversation.listing else None
 
         print(f"Debug: perform_create - Gefundener Empfänger: {empfaenger.username if empfaenger else 'Kein Empfänger gefunden (None)'}")
-        print(f"Debug: perform_create - Verknüpfte Anzeige: {anzeige.titel if anzeige else 'Keine Anzeige verknüpft'}")
+        print(f"Debug: perform_create - Verknüpfte Anzeige: {anzeige.title if anzeige else 'Keine Anzeige verknüpft'}")
 
         if not empfaenger:
             print(f"Debug: perform_create - Fehler: Kein Empfänger gefunden, obwohl erwartet.")
@@ -127,7 +127,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         print(f"Debug: perform_create - Validated Data before save: {serializer.validated_data}")
 
         # Save the message with determined sender, conversation, and recipient
-        serializer.save(sender=self.request.user, conversation=conversation, empfaenger=empfaenger, anzeige=anzeige)
+        serializer.save(sender=self.request.user, conversation=conversation, recipient=empfaenger, listing=anzeige)
         print(f"Debug: perform_create - Nachricht erfolgreich in DB gespeichert.")
 
     @action(detail=True, methods=['post'])
@@ -140,7 +140,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         # und noch nicht gelesen sind, als gelesen.
         messages_to_mark = conversation.messages.filter(
             is_read=False,
-            empfaenger=request.user # Nur Nachrichten markieren, wo der aktuelle Benutzer der Empfänger ist
+            recipient=request.user # Nur Nachrichten markieren, wo der aktuelle Benutzer der Empfänger ist
         )
         count_updated = messages_to_mark.update(is_read=True)
 
@@ -174,14 +174,15 @@ class MessageViewSet(viewsets.ModelViewSet):
                 conversation=conversation,
                 sender=sender,
                 recipient=recipient,
+                listing=listing,
                 content=content,
-                file=file,
             )
             serializer = MessageSerializer(message)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except Listing.DoesNotExist:
             return Response({'detail': 'Listing not found.'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
+            print("Fehler beim Senden der Nachricht:", e)
             return Response({'detail': 'Internal server error while sending message.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=['get'])
