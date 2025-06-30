@@ -49,8 +49,6 @@ class ListingSerializer(serializers.ModelSerializer):
         return value
 
     def validate_description(self, value):
-        if len(value) < 10:
-            raise serializers.ValidationError("Description must be at least 10 characters long")
         return value
 
     def create(self, validated_data):
@@ -68,16 +66,19 @@ class ListingSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         try:
             images_data = self.context.get('request').FILES.getlist('images')
-            
+
             for attr, value in validated_data.items():
                 setattr(instance, attr, value)
             instance.save()
-            
-            if images_data:
+
+            request = self.context.get('request')
+            if (images_data and len(images_data) > 0):
                 instance.images.all().delete()
                 for image_data in images_data:
                     ListingImage.objects.create(listing=instance, image=image_data)
-            
+            elif request and request.data.get('images') == '[]':
+                instance.images.all().delete()
+
             return instance
         except Exception as e:
             raise serializers.ValidationError(f"Error updating listing: {str(e)}") 

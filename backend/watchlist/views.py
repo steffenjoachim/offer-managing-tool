@@ -4,13 +4,20 @@ from django.shortcuts import get_object_or_404
 from ads.models import Listing
 from .models import WatchlistItem
 from .serializers import WatchlistItemSerializer
+from django.utils import timezone
+from django.db import models
 
 class WatchlistListCreateView(generics.ListCreateAPIView):
     serializer_class = WatchlistItemSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return WatchlistItem.objects.filter(user=self.request.user).order_by('-added_at')
+        now = timezone.now()
+        return WatchlistItem.objects.filter(
+            user=self.request.user,
+            listing__is_active=True,
+            listing__created_at__gte=now - timezone.timedelta(days=30)
+        ).order_by('-added_at')
 
     def perform_create(self, serializer):
         listing_id = self.request.data.get('listing_id')

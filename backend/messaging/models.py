@@ -23,7 +23,7 @@ class Conversation(models.Model):
 
     def __str__(self):
         if self.listing:
-            return f"Konversation zu Anzeige {self.listing.titel} ({self.id})"
+            return f"Konversation zu Anzeige {self.listing.title} ({self.id})"
         return f"Konversation {self.id}"
 
 class Message(models.Model):
@@ -34,6 +34,7 @@ class Message(models.Model):
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
+    file = models.FileField(upload_to='message_files/', null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
