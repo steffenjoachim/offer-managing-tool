@@ -25,6 +25,8 @@ class Listing(models.Model):
     is_active = models.BooleanField(default=True)
     views_count = models.PositiveIntegerField(default=0)
     favorites_count = models.PositiveIntegerField(default=0)
+    # Ablaufdatum der Anzeige, kann für Verlängerungen genutzt werden
+    valid_until = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -37,12 +39,19 @@ class Listing(models.Model):
     def __str__(self):
         return f"{self.title} - {self.price}"
 
+    def save(self, *args, **kwargs):
+        # Setze valid_until beim ersten Speichern auf jetzt + 3 Tage, falls nicht gesetzt
+        if not self.valid_until:
+            basis = self.created_at if self.created_at else timezone.now()
+            self.valid_until = basis + timezone.timedelta(days=3)
+        super().save(*args, **kwargs)
+
     @property
     def is_expired(self):
-        if not self.created_at:
+        # Nutze valid_until für die Ablaufprüfung
+        if not self.valid_until:
             return False
-        expiration_date = self.created_at + timezone.timedelta(days=30)
-        return timezone.now() > expiration_date
+        return timezone.now() > self.valid_until
 
     def increment_views(self):
         self.views_count += 1

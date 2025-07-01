@@ -109,6 +109,8 @@ export default {
         listings.value = listings.value.filter(
           (listing) => !isExpired(listing)
         );
+        // Speichere eine Kopie der geladenen Listings für die Suchfunktion
+        originalListings.value = listings.value.slice();
       } catch (err) {
         console.error("Error fetching listings:", err);
         error.value = "Failed to load listings";
