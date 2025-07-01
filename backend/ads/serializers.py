@@ -21,14 +21,16 @@ class ListingSerializer(serializers.ModelSerializer):
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
     is_expired = serializers.SerializerMethodField()
+    valid_until = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Listing
         fields = [
             'id', 'user', 'title', 'description', 'price', 'category',
-            'images', 'created_at', 'updated_at', 'is_expired'
+            'images', 'created_at', 'updated_at', 'is_expired',
+            'valid_until',
         ]
-        read_only_fields = ['user', 'created_at', 'updated_at']
+        read_only_fields = ['user', 'created_at', 'updated_at', 'valid_until']
 
     def get_is_expired(self, obj):
         if not obj.created_at:

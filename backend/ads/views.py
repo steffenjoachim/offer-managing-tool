@@ -5,7 +5,10 @@ from rest_framework.pagination import PageNumberPagination
 from .models import Listing, ListingImage
 from .serializers import ListingSerializer, ListingImageSerializer
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, AllowAny, BasePermission, SAFE_METHODS
+from rest_framework.permissions import IsAuthenticated
 import logging
+from rest_framework.views import APIView
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +39,8 @@ class ListingListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         try:
             queryset = super().get_queryset()
+            # Zeige nur gültige Anzeigen (valid_until in der Zukunft)
+            queryset = queryset.filter(valid_until__gt=timezone.now())
             if self.request.path.endswith('my/'):
                 queryset = queryset.filter(user=self.request.user)
             return queryset
@@ -87,3 +92,22 @@ class ListingDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Listing.objects.all()
     serializer_class = ListingSerializer
     permission_classes = [IsOwnerOrReadOnly | IsAuthenticatedOrReadOnly]
+
+# Verlängerungs-API für Listings
+class ExtendListingValidityView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            listing = Listing.objects.get(pk=pk)
+            if listing.user != request.user:
+                return Response({'detail': 'Nicht berechtigt.'}, status=status.HTTP_403_FORBIDDEN)
+            # Setze valid_until auf jetzt + 3 Tage (egal wie weit in der Zukunft)
+            listing.valid_until = timezone.now() + timezone.timedelta(days=3)
+            listing.save()
+            return Response({'valid_until': listing.valid_until}, status=status.HTTP_200_OK)
+        except Listing.DoesNotExist:
+            return Response({'detail': 'Anzeige nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Fehler bei Verlängerung: {str(e)}")
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)

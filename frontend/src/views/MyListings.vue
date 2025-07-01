@@ -61,7 +61,8 @@
                     {{ formatDate(listing.created_at) }}
                   </p>
                   <p class="listing-validity">
-                    Validity: {{ getValidityStatus(listing.created_at) }}
+                    Validity:
+                    {{ getValidityStatusFromValidUntil(listing.valid_until) }}
                   </p>
                   <div class="listing-actions">
                     <el-button
@@ -84,6 +85,13 @@
                       @click="editListing(listing.id)"
                     >
                       Edit
+                    </el-button>
+                    <el-button
+                      type="success"
+                      size="small"
+                      @click="extendListing(listing.id)"
+                    >
+                      Extend
                     </el-button>
                   </div>
                 </div>
@@ -171,24 +179,23 @@ export default {
       return isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString();
     };
 
-    // Helper function to get validity status
-    const getValidityStatus = (createdAtString) => {
-      if (!createdAtString) return "N/A";
-
-      // Setze die Zeit auf Mitternacht für beide Daten
-      const createdDate = new Date(createdAtString);
-      createdDate.setHours(0, 0, 0, 0);
-
+    // Calculate day difference in UTC to avoid timezone issues
+    const getValidityStatusFromValidUntil = (validUntilString) => {
+      if (!validUntilString) return "N/A";
       const now = new Date();
-      now.setHours(0, 0, 0, 0);
-
-      const expirationDate = new Date(createdDate);
-      expirationDate.setDate(createdDate.getDate() + VALIDITY_DAYS);
-
-      // Berechne die Differenz in Tagen
-      const diffTime = expirationDate.getTime() - now.getTime();
+      const todayUTC = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+      );
+      const validUntil = new Date(validUntilString);
+      const validUntilUTC = new Date(
+        Date.UTC(
+          validUntil.getUTCFullYear(),
+          validUntil.getUTCMonth(),
+          validUntil.getUTCDate()
+        )
+      );
+      const diffTime = validUntilUTC.getTime() - todayUTC.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
       if (diffDays > 0) {
         return `Expires in ${diffDays} day${diffDays === 1 ? "" : "s"}`;
       } else if (diffDays === 0) {
@@ -268,6 +275,18 @@ export default {
       router.push("/create-listing");
     };
 
+    // Verlängerungsfunktion für eine Anzeige
+    const extendListing = async (id) => {
+      try {
+        await axios.patch(`http://localhost:8000/api/listings/${id}/extend/`);
+        showSuccess("Validity extended by 3 days.");
+        await fetchMyListings(store.getters["auth/currentUser"]?.id);
+      } catch (err) {
+        showError("Fehler beim Verlängern der Anzeige.");
+        console.error("Fehler beim Verlängern:", err);
+      }
+    };
+
     return {
       loading,
       error,
@@ -277,7 +296,8 @@ export default {
       editListing,
       navigateToCreateListing,
       formatDate,
-      getValidityStatus,
+      getValidityStatusFromValidUntil,
+      extendListing,
     };
   },
 };
